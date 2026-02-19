@@ -1,0 +1,2 @@
+# TLS scan – daily at 02:00
+0 2 * * * www-data /usr/local/bin/php /var/www/html/cli/scan.php >> /var/www/html/logs/scan.log 2>&1
