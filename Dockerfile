@@ -19,12 +19,14 @@ COPY --from=composer:2 /usr/local/bin/composer /usr/local/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy application files
-COPY . .
+# Copy Composer manifest files first to leverage Docker layer caching
+COPY composer.json composer.lock ./
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
+# Copy application files
+COPY . .
 # Create data and logs directories
 RUN mkdir -p /var/www/html/data /var/www/html/logs
 
