@@ -1,0 +1,16 @@
+services:
+  tls-monitor:
+    build: .
+    container_name: tls-monitor
+    ports:
+      - "8443:80"
+    volumes:
+      - tls-data:/var/www/html/data
+      - tls-logs:/var/www/html/logs
+    environment:
+      - TZ=Europe/Berlin
+    restart: unless-stopped
+
+volumes:
+  tls-data:
+  tls-logs:
