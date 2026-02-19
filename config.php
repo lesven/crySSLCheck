@@ -8,11 +8,11 @@
 define('DB_PATH', __DIR__ . '/data/tls_monitor.sqlite');
 
 // --- Domain-Validierung ---
-define('ALLOW_IP_ADDRESSES', false); // true = IP-Adressen erlaubt, false = nur FQDNs
+define('ALLOW_IP_ADDRESSES', true); // true = IP-Adressen erlaubt, false = nur FQDNs
 
 // --- Scan-Engine ---
 define('SCAN_TIMEOUT', 10);          // Verbindungs-Timeout in Sekunden
-define('RETRY_DELAY', 30);           // Sekunden bis zum Retry
+define('RETRY_DELAY', 5);           // Sekunden bis zum Retry
 define('RETRY_COUNT', 1);            // Anzahl Retries bei UNREACHABLE/ERROR
 define('NOTIFY_ON_UNREACHABLE', false); // E-Mail bei UNREACHABLE/ERROR senden?
 

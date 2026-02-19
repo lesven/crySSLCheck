@@ -140,11 +140,15 @@ class ScanService
                 'finding_type' => 'OK',
                 'severity'     => 'ok',
                 'details'      => [
-                    'protocol'       => $result['protocol'] ?? 'unknown',
-                    'valid_to'       => $result['valid_to'] ?? 'unknown',
-                    'days_remaining' => $daysRemaining ?? null,
-                    'subject'        => $result['subject'] ?? '',
-                    'issuer'         => $result['issuer'] ?? '',
+                    'protocol'        => $result['protocol'] ?? 'unknown',
+                    'cipher_name'     => $result['cipher_name'] ?? 'unknown',
+                    'cipher_bits'     => $result['cipher_bits'] ?? null,
+                    'cipher_version'  => $result['cipher_version'] ?? null,
+                    'valid_to'        => $result['valid_to'] ?? 'unknown',
+                    'valid_from'      => $result['valid_from'] ?? 'unknown',
+                    'days_remaining'  => $daysRemaining ?? null,
+                    'subject'         => $result['subject'] ?? '',
+                    'issuer'          => $result['issuer'] ?? '',
                 ],
             ];
         }
@@ -222,6 +226,9 @@ class ScanService
                         }
                         $meta = stream_get_meta_data($streamRetry);
                         $result['protocol'] = $meta['crypto']['protocol'] ?? 'unknown';
+                        $result['cipher_name'] = $meta['crypto']['cipher_name'] ?? 'unknown';
+                        $result['cipher_bits'] = $meta['crypto']['cipher_bits'] ?? null;
+                        $result['cipher_version'] = $meta['crypto']['cipher_version'] ?? null;
                         fclose($streamRetry);
                     }
 
@@ -238,6 +245,11 @@ class ScanService
 
             // Get protocol version
             $result['protocol'] = $meta['crypto']['protocol'] ?? 'unknown';
+            
+            // Get cipher suite
+            $result['cipher_name'] = $meta['crypto']['cipher_name'] ?? 'unknown';
+            $result['cipher_bits'] = $meta['crypto']['cipher_bits'] ?? null;
+            $result['cipher_version'] = $meta['crypto']['cipher_version'] ?? null;
 
             // Parse certificate
             if (isset($params['options']['ssl']['peer_certificate'])) {

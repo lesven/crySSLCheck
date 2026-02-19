@@ -49,6 +49,7 @@ ob_start();
                     <th>Domain</th>
                     <th>Port</th>
                     <th>Finding-Typ</th>
+                    <th>Details</th>
                     <th>Severity</th>
                     <th>Datum</th>
                     <th>Status</th>
@@ -60,6 +61,43 @@ ob_start();
                         <td><?= htmlspecialchars($finding['fqdn']) ?></td>
                         <td><?= htmlspecialchars($finding['port']) ?></td>
                         <td><?= htmlspecialchars($finding['finding_type']) ?></td>
+                        <td>
+                            <?php 
+                            $details = is_string($finding['details']) ? json_decode($finding['details'], true) : $finding['details'];
+                            if ($finding['finding_type'] === 'OK' && !empty($details)): 
+                            ?>
+                                <small>
+                                    <?php if (!empty($details['protocol'])): ?>
+                                        <strong>TLS:</strong> <?= htmlspecialchars($details['protocol']) ?><br>
+                                    <?php endif; ?>
+                                    <?php if (!empty($details['cipher_name'])): ?>
+                                        <strong>Cipher:</strong> <?= htmlspecialchars($details['cipher_name']) ?>
+                                        <?php if (!empty($details['cipher_bits'])): ?>
+                                            (<?= htmlspecialchars($details['cipher_bits']) ?>-bit)
+                                        <?php endif; ?><br>
+                                    <?php endif; ?>
+                                    <?php if (!empty($details['valid_to'])): ?>
+                                        <strong>Gültig bis:</strong> <?= htmlspecialchars($details['valid_to']) ?>
+                                        <?php if (isset($details['days_remaining'])): ?>
+                                            (<?= (int)$details['days_remaining'] ?>d)
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </small>
+                            <?php elseif ($finding['finding_type'] === 'CERT_EXPIRY' && !empty($details['expiry_date'])): ?>
+                                <small>
+                                    <strong>Läuft ab:</strong> <?= htmlspecialchars($details['expiry_date']) ?>
+                                    <?php if (isset($details['days_remaining'])): ?>
+                                        (<?= (int)$details['days_remaining'] ?> Tage)
+                                    <?php endif; ?>
+                                </small>
+                            <?php elseif ($finding['finding_type'] === 'TLS_VERSION' && !empty($details['protocol'])): ?>
+                                <small>Unsicher: <?= htmlspecialchars($details['protocol']) ?></small>
+                            <?php elseif (!empty($details['error'])): ?>
+                                <small class="text-muted"><?= htmlspecialchars(substr($details['error'], 0, 100)) ?></small>
+                            <?php else: ?>
+                                <small class="text-muted">–</small>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php
                             $badgeClass = match ($finding['severity']) {

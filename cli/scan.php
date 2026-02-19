@@ -11,7 +11,9 @@
  *   0 2 * * * php /path/to/cli/scan.php
  *
  * Usage:
- *   php cli/scan.php
+ *   php cli/scan.php [--force|-f]
+ * Optionen:
+ *   --force, -f    Erzwingt Scan auch wenn bereits ein erfolgreicher Scan heute existiert.
  */
 
 // Prevent web access
@@ -49,11 +51,16 @@ if (file_exists($autoload)) {
 // Initialize database
 \App\Database::initialize();
 
-// Check idempotency – skip if already scanned today with success
-$todayRun = \App\Model\ScanRun::findLatestToday();
-if ($todayRun && $todayRun['status'] === 'success') {
-    echo "Scan für heute bereits erfolgreich durchgeführt (Run #{$todayRun['id']}). Überspringe.\n";
-    exit(0);
+// Check idempotency – skip if already scanned today with success (use --force or -f to override)
+$force = (isset($argv) && (in_array('--force', $argv, true) || in_array('-f', $argv, true)));
+if ($force) {
+    echo "Force-Option erkannt — erzwinge Scan trotz vorherigem erfolgreichen Lauf.\n";
+} else {
+    $todayRun = \App\Model\ScanRun::findLatestToday();
+    if ($todayRun && $todayRun['status'] === 'success') {
+        echo "Scan für heute bereits erfolgreich durchgeführt (Run #{$todayRun['id']}). Überspringe.\n";
+        exit(0);
+    }
 }
 
 echo "TLS Monitor – Starte vollständigen Scan...\n";

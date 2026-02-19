@@ -40,7 +40,39 @@ ob_start();
                         'low' => 'secondary',
                         default => 'success',
                     } ?>"><?= htmlspecialchars($result['severity']) ?></span>
-                    <?= htmlspecialchars($result['finding_type']) ?>
+                    <strong><?= htmlspecialchars($result['finding_type']) ?></strong>
+                    <?php 
+                    $details = is_string($result['details']) ? json_decode($result['details'], true) : $result['details'];
+                    if ($result['finding_type'] === 'OK' && !empty($details)): 
+                    ?>
+                        <div class="small mt-1 text-muted">
+                            <?php if (!empty($details['protocol'])): ?>
+                                <i class="bi bi-shield-check"></i> <strong>Protokoll:</strong> <?= htmlspecialchars($details['protocol']) ?><br>
+                            <?php endif; ?>
+                            <?php if (!empty($details['cipher_name'])): ?>
+                                <i class="bi bi-key"></i> <strong>Cipher:</strong> <?= htmlspecialchars($details['cipher_name']) ?>
+                                <?php if (!empty($details['cipher_bits'])): ?>
+                                    (<?= htmlspecialchars($details['cipher_bits']) ?> bits)
+                                <?php endif; ?><br>
+                            <?php endif; ?>
+                            <?php if (!empty($details['valid_to'])): ?>
+                                <i class="bi bi-calendar-check"></i> <strong>Gültig bis:</strong> <?= htmlspecialchars($details['valid_to']) ?>
+                                <?php if (isset($details['days_remaining'])): ?>
+                                    (noch <?= (int)$details['days_remaining'] ?> Tage)
+                                <?php endif; ?><br>
+                            <?php endif; ?>
+                            <?php if (!empty($details['subject'])): ?>
+                                <i class="bi bi-file-earmark-text"></i> <strong>Zertifikat:</strong> <?= htmlspecialchars($details['subject']) ?>
+                            <?php endif; ?>
+                        </div>
+                    <?php elseif (!empty($details['expiry_date'])): ?>
+                        <div class="small mt-1">
+                            Läuft ab: <?= htmlspecialchars($details['expiry_date']) ?>
+                            <?php if (isset($details['days_remaining'])): ?>
+                                (<?= (int)$details['days_remaining'] ?> Tage)
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 </li>
             <?php endforeach; ?>
         </ul>

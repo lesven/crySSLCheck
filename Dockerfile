@@ -1,3 +1,7 @@
+# Composer Stage
+FROM composer:2 AS composer
+
+# Application Stage
 FROM php:8.2-apache
 
 # Install system dependencies
@@ -14,7 +18,7 @@ RUN docker-php-ext-install pdo pdo_sqlite
 RUN a2enmod rewrite
 
 # Install Composer
-COPY --from=composer:2 /usr/local/bin/composer /usr/local/bin/composer
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 
 # Set working directory
 WORKDIR /var/www/html
