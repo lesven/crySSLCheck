@@ -76,6 +76,9 @@ ob_start();
                                             (<?= htmlspecialchars($details['cipher_bits']) ?>-bit)
                                         <?php endif; ?><br>
                                     <?php endif; ?>
+                                    <?php if (!empty($details['public_key_type']) && !empty($details['public_key_bits'])): ?>
+                                        <strong>Key:</strong> <?= htmlspecialchars($details['public_key_type']) ?> <?= htmlspecialchars($details['public_key_bits']) ?> bits<br>
+                                    <?php endif; ?>
                                     <?php if (!empty($details['valid_to'])): ?>
                                         <strong>Gültig bis:</strong> <?= htmlspecialchars($details['valid_to']) ?>
                                         <?php if (isset($details['days_remaining'])): ?>
@@ -92,6 +95,11 @@ ob_start();
                                 </small>
                             <?php elseif ($finding['finding_type'] === 'TLS_VERSION' && !empty($details['protocol'])): ?>
                                 <small>Unsicher: <?= htmlspecialchars($details['protocol']) ?></small>
+                            <?php elseif ($finding['finding_type'] === 'RSA_KEY_LENGTH' && !empty($details['key_bits'])): ?>
+                                <small>
+                                    <strong>RSA-Schlüssellänge:</strong> <?= htmlspecialchars($details['key_bits']) ?> bits
+                                    <?php if (!empty($details['message'])): ?> — <?= htmlspecialchars($details['message']) ?><?php endif; ?>
+                                </small>
                             <?php elseif (!empty($details['error'])): ?>
                                 <small class="text-muted"><?= htmlspecialchars(substr($details['error'], 0, 100)) ?></small>
                             <?php else: ?>

@@ -134,6 +134,21 @@ class ScanService
             ];
         }
 
+        // Check RSA public-key length (if certificate uses RSA)
+        if (isset($result['public_key_type']) && strtoupper($result['public_key_type']) === 'RSA' && isset($result['public_key_bits'])) {
+            $bits = (int) $result['public_key_bits'];
+            if ($bits < MIN_RSA_KEY_BITS) {
+                $findings[] = [
+                    'finding_type' => 'RSA_KEY_LENGTH',
+                    'severity'     => ($bits < 1024 ? 'critical' : 'high'),
+                    'details'      => [
+                        'key_bits' => $bits,
+                        'message'  => "RSA-Schlüssellänge zu kurz: {$bits} bits (empfohlen >= " . MIN_RSA_KEY_BITS . ")",
+                    ],
+                ];
+            }
+        }
+
         // If no problems found, add OK finding
         if (empty($findings)) {
             $findings[] = [
@@ -149,6 +164,8 @@ class ScanService
                     'days_remaining'  => $daysRemaining ?? null,
                     'subject'         => $result['subject'] ?? '',
                     'issuer'          => $result['issuer'] ?? '',
+                    'public_key_type' => $result['public_key_type'] ?? null,
+                    'public_key_bits' => $result['public_key_bits'] ?? null,
                 ],
             ];
         }
@@ -216,12 +233,29 @@ class ScanService
                     if ($streamRetry !== false) {
                         $params = stream_context_get_params($streamRetry);
                         if (isset($params['options']['ssl']['peer_certificate'])) {
-                            $certInfo = openssl_x509_parse($params['options']['ssl']['peer_certificate']);
+                            $certPem = $params['options']['ssl']['peer_certificate'];
+                            $certInfo = openssl_x509_parse($certPem);
                             if ($certInfo) {
                                 $result['valid_to'] = date('Y-m-d H:i:s', $certInfo['validTo_time_t']);
                                 $result['valid_from'] = date('Y-m-d H:i:s', $certInfo['validFrom_time_t']);
                                 $result['subject'] = $certInfo['subject']['CN'] ?? '';
                                 $result['issuer'] = $certInfo['issuer']['CN'] ?? '';
+                            }
+
+                            // Extract public key details (type + bits) when available
+                            $pubKey = @openssl_pkey_get_public($certPem);
+                            if ($pubKey !== false) {
+                                $keyDetails = openssl_pkey_get_details($pubKey);
+                                if ($keyDetails && isset($keyDetails['bits'])) {
+                                    $result['public_key_bits'] = $keyDetails['bits'];
+                                    $types = [
+                                        OPENSSL_KEYTYPE_RSA => 'RSA',
+                                        OPENSSL_KEYTYPE_DSA => 'DSA',
+                                        OPENSSL_KEYTYPE_DH  => 'DH',
+                                        OPENSSL_KEYTYPE_EC  => 'EC',
+                                    ];
+                                    $result['public_key_type'] = $types[$keyDetails['type']] ?? 'UNKNOWN';
+                                }
                             }
                         }
                         $meta = stream_get_meta_data($streamRetry);
@@ -253,13 +287,40 @@ class ScanService
 
             // Parse certificate
             if (isset($params['options']['ssl']['peer_certificate'])) {
-                $certInfo = openssl_x509_parse($params['options']['ssl']['peer_certificate']);
+                $certPem = $params['options']['ssl']['peer_certificate'];
+                $certInfo = openssl_x509_parse($certPem);
                 if ($certInfo) {
                     $result['valid_to'] = date('Y-m-d H:i:s', $certInfo['validTo_time_t']);
                     $result['valid_from'] = date('Y-m-d H:i:s', $certInfo['validFrom_time_t']);
                     $result['subject'] = $certInfo['subject']['CN'] ?? '';
                     $result['issuer'] = $certInfo['issuer']['CN'] ?? '';
                     $result['serial'] = $certInfo['serialNumberHex'] ?? '';
+                }
+
+                // Extract public key details (type + bits) when available
+                $pubKey = false;
+                // If cert is a resource, export to PEM first; otherwise try directly
+                if (is_resource($certPem) || is_object($certPem)) {
+                    $pem = '';
+                    if (openssl_x509_export($certPem, $pem)) {
+                        $pubKey = @openssl_pkey_get_public($pem);
+                    }
+                } else {
+                    $pubKey = @openssl_pkey_get_public($certPem);
+                }
+
+                if ($pubKey !== false) {
+                    $keyDetails = openssl_pkey_get_details($pubKey);
+                    if ($keyDetails && isset($keyDetails['bits'])) {
+                        $result['public_key_bits'] = $keyDetails['bits'];
+                        $types = [
+                            OPENSSL_KEYTYPE_RSA => 'RSA',
+                            OPENSSL_KEYTYPE_DSA => 'DSA',
+                            OPENSSL_KEYTYPE_DH  => 'DH',
+                            OPENSSL_KEYTYPE_EC  => 'EC',
+                        ];
+                        $result['public_key_type'] = $types[$keyDetails['type']] ?? 'UNKNOWN';
+                    }
                 }
             }
 

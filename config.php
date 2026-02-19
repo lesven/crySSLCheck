@@ -16,6 +16,10 @@ define('RETRY_DELAY', 5);           // Sekunden bis zum Retry
 define('RETRY_COUNT', 1);            // Anzahl Retries bei UNREACHABLE/ERROR
 define('NOTIFY_ON_UNREACHABLE', false); // E-Mail bei UNREACHABLE/ERROR senden?
 
+// Mindestanforderungen
+// Mindest-RSA-Schlüssellänge (Bits). Standardsicher ist mindestens 2048; längere Schlüssel können sinnvoll sein.
+define('MIN_RSA_KEY_BITS', 2048);
+
 // --- Zertifikats-Schwellwerte (Tage) ---
 define('CERT_WARN_DAYS', [30, 14, 7]);
 

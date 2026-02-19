@@ -55,6 +55,9 @@ ob_start();
                                     (<?= htmlspecialchars($details['cipher_bits']) ?> bits)
                                 <?php endif; ?><br>
                             <?php endif; ?>
+                            <?php if (!empty($details['public_key_type']) && !empty($details['public_key_bits'])): ?>
+                                <i class="bi bi-key-fill"></i> <strong>Key:</strong> <?= htmlspecialchars($details['public_key_type']) ?> <?= htmlspecialchars($details['public_key_bits']) ?> bits<br>
+                            <?php endif; ?>
                             <?php if (!empty($details['valid_to'])): ?>
                                 <i class="bi bi-calendar-check"></i> <strong>Gültig bis:</strong> <?= htmlspecialchars($details['valid_to']) ?>
                                 <?php if (isset($details['days_remaining'])): ?>
