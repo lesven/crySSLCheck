@@ -36,7 +36,7 @@ COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 
 # Copy cron configuration
 COPY docker/crontab /etc/cron.d/tls-scan
-RUN chmod 0644 /etc/cron.d/tls-scan && crontab /etc/cron.d/tls-scan
+RUN chmod 0644 /etc/cron.d/tls-scan
 
 # Copy entrypoint
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
