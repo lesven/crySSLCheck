@@ -1,0 +1,13 @@
+{
+    "name": "tls-monitor/poc",
+    "description": "TLS Monitor POC – Domain TLS/SSL certificate monitoring tool",
+    "type": "project",
+    "require": {
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}
