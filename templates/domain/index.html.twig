@@ -115,8 +115,8 @@
                                         </button>
                                     </form>
 
-                                    <form method="POST" action="{{ path('domain_delete', {id: domain.id}) }}" class="d-inline"
-                                          onsubmit="return confirm('Domain „{{ domain.fqdn|e('js') }}" wirklich löschen?')">
+                                    <form method="POST" action="{{ path('domain_delete', {id: domain.id}) }}"
+                                          class="d-inline domain-delete-form" data-fqdn="{{ domain.fqdn }}">
                                         <input type="hidden" name="_token" value="{{ csrf_token('delete-domain-' ~ domain.id) }}">
                                         <button type="submit" class="btn btn-outline-danger" title="Löschen">
                                             <i class="bi bi-trash"></i>
@@ -140,5 +140,14 @@
     // Prevent re-display on refresh
     history.replaceState(null, '', window.location.pathname);
 {% endif %}
+
+document.querySelectorAll('.domain-delete-form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+        var fqdn = form.getAttribute('data-fqdn');
+        if (!confirm('Domain \u201e' + fqdn + '\u201c wirklich l\u00f6schen?')) {
+            e.preventDefault();
+        }
+    });
+});
 </script>
 {% endblock %}
