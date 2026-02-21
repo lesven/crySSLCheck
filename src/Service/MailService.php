@@ -24,6 +24,26 @@ class MailService
         return !empty($this->alertRecipients) && !empty($this->fromEmail);
     }
 
+    /**
+     * Returns an array of problems that prevent SMTP from working.
+     * The caller can use this for tooltips or health checks.
+     *
+     * @return string[]
+     */
+    public function getConfigurationErrors(): array
+    {
+        $errors = [];
+
+        if (empty($this->fromEmail)) {
+            $errors[] = 'Absenderadresse fehlt';
+        }
+        if (empty($this->alertRecipients)) {
+            $errors[] = 'Empfängerliste leer';
+        }
+
+        return $errors;
+    }
+
     public function sendFindingAlert(Domain $domain, Finding $finding): bool
     {
         if (empty($this->alertRecipients)) {

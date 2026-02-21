@@ -325,6 +325,14 @@ make restart   # startet Container neu, der Mount bleibt bestehen
 **Akzeptanzkriterien:**
 
 - Konfiguration in `config.php`: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_ENCRYPTION` (`tls` / `ssl` / `none`)
+
+> **Hinweis für Entwickler:** der Container lädt Umgebungsvariablen aus `.env`;
+> für lokale Tests können Sie außerdem eine `.env.dev` anlegen. Sie wird
+> über `docker-compose.yml` in den Container gemountet (`- ./.env.dev:/var/www/html/.env.dev:ro`)
+> und beim Start durch `docker/entrypoint.sh` eingelesen, so dass Werte wie
+> `ALERT_RECIPIENTS` wirksam werden. Führen Sie nach Änderung einen
+> `docker-compose down && docker-compose up -d --build` aus, damit die
+> neuen Einstellungen übernommen werden.
 - PHPMailer wird als Composer-Dependency eingebunden
 - Admin-UI enthält „Test-Mail senden"-Button – sendet Testmail an konfigurierten Empfänger und zeigt Erfolg/Fehler im UI
 - SMTP-Passwort wird nicht geloggt

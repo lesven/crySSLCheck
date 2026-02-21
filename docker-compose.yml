@@ -8,8 +8,13 @@ services:
       # bind the project directory into the container for fast development
       - ./:/var/www/html:delegated
       - ./.env:/var/www/html/.env:ro
+      - ./.env.dev:/var/www/html/.env.dev:ro
       - tls-data:/var/www/html/data
       - tls-logs:/var/www/html/var/log
+    # load environment variables from .env plus .env.dev when present
+    env_file:
+      - .env
+      - .env.dev
     environment:
       - TZ=Europe/Berlin
       - APP_ENV=dev

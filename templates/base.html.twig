@@ -14,6 +14,21 @@
             <a class="navbar-brand" href="{{ path('domain_index') }}">
                 <i class="bi bi-shield-lock"></i> TLS Monitor
             </a>
+            {# display SMTP configuration state next to branding #}
+            {% if mailService.isConfigured() %}
+                <span class="badge bg-success ms-2"
+                      data-bs-toggle="tooltip"
+                      title="SMTP ist korrekt konfiguriert">
+                    SMTP konfiguriert
+                </span>
+            {% else %}
+                {% set errors = mailService.getConfigurationErrors() %}
+                <span class="badge bg-warning text-dark ms-2"
+                      data-bs-toggle="tooltip"
+                      title="{{ errors|join(', ') }}">
+                    SMTP nicht konfiguriert
+                </span>
+            {% endif %}
             {% if app.user %}
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                     <span class="navbar-toggler-icon"></span>
@@ -77,6 +92,12 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function (el) { new bootstrap.Tooltip(el); });
+        });
+    </script>
     {% block javascripts %}{% endblock %}
 </body>
 </html>

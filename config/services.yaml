@@ -33,10 +33,12 @@ services:
             $minRsaKeyBits: '%app.min_rsa_key_bits%'
 
     App\Service\MailService:
+        public: true
         arguments:
             $fromEmail: '%app.mailer_from_email%'
             $fromName: '%app.mailer_from_name%'
             $alertRecipients: '%app.alert_recipients%'
+
 
     App\Service\ValidationService:
         arguments:

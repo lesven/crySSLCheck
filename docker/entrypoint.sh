@@ -1,6 +1,18 @@
 #!/bin/bash
 set -e
 
+# if a .env.dev file is present (used for local development), load its
+# variables into the environment so Symfony / Dotenv sees them.  This is
+# necessary because the project mounts only .env into the container and
+# Dotenv would otherwise overwrite the values with the empty defaults.
+if [ -f /var/www/html/.env.dev ]; then
+    echo "Loading environment overrides from .env.dev"
+    set -a
+    # shellcheck disable=SC1090
+    source /var/www/html/.env.dev
+    set +a
+fi
+
 # Verzeichnisse anlegen
 mkdir -p /var/www/html/data /var/www/html/var/cache /var/www/html/var/log
 

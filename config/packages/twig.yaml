@@ -1,6 +1,12 @@
 twig:
     file_name_pattern: '*.twig'
 
+    # make the mail service available to all templates so the header
+    # can display SMTP configuration status
+    globals:
+        # use standard service id with single backslashes; it must be public
+        mailService: '@App\Service\MailService'
+
 when@test:
     twig:
         strict_variables: true
