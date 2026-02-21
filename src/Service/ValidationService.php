@@ -36,6 +36,28 @@ class ValidationService
         return $errors;
     }
 
+    /**
+     * Validates a domain row during CSV import (no duplicate check, as duplicates are updated).
+     *
+     * @return string[] List of error messages
+     */
+    public function validateDomainForImport(string $fqdn, int $port): array
+    {
+        $errors = [];
+
+        if (empty($fqdn)) {
+            $errors[] = 'FQDN ist ein Pflichtfeld.';
+        } elseif (!$this->isValidFqdn($fqdn)) {
+            $errors[] = 'Ungültiges FQDN-Format.';
+        }
+
+        if ($port < 1 || $port > 65535) {
+            $errors[] = 'Port muss zwischen 1 und 65535 liegen.';
+        }
+
+        return $errors;
+    }
+
     public function isValidFqdn(string $fqdn): bool
     {
         if ($this->allowIpAddresses && filter_var($fqdn, FILTER_VALIDATE_IP)) {
