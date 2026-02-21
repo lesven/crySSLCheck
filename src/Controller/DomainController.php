@@ -9,6 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -34,6 +35,36 @@ class DomainController extends AbstractController
             'domains'      => $this->domainRepository->findAllOrderedByFqdn(),
             'scan_results' => $scanResults,
         ]);
+    }
+
+    #[Route('/export', name: 'domain_export', methods: ['GET'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function export(): StreamedResponse
+    {
+        $domains = $this->domainRepository->findAllOrderedByFqdn();
+
+        $response = new StreamedResponse(function () use ($domains): void {
+            $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                return;
+            }
+            fputcsv($handle, ['FQDN', 'Port', 'Beschreibung', 'Status']);
+            foreach ($domains as $domain) {
+                fputcsv($handle, [
+                    $domain->getFqdn(),
+                    $domain->getPort(),
+                    $domain->getDescription() ?? '',
+                    $domain->isActive() ? 'active' : 'inactive',
+                ]);
+            }
+            fclose($handle);
+        });
+
+        $filename = 'domains_' . (new \DateTimeImmutable())->format('Y-m-d_H-i-s') . '.csv';
+        $response->headers->set('Content-Type', 'text/csv; charset=UTF-8');
+        $response->headers->set('Content-Disposition', 'attachment; filename="' . $filename . '"');
+
+        return $response;
     }
 
     #[Route('/new', name: 'domain_new', methods: ['GET', 'POST'])]
