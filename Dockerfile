@@ -2,7 +2,7 @@
 FROM composer:2 AS composer
 
 # Application Stage
-FROM php:8.2-apache
+FROM php:8.4-apache
 
 # System-Abhängigkeiten installieren
 RUN apt-get update && apt-get install -y \
@@ -26,8 +26,8 @@ WORKDIR /var/www/html
 # Composer-Dateien zuerst kopieren (Layer-Caching)
 COPY composer.json composer.lock symfony.lock ./
 
-# PHP-Abhängigkeiten installieren (ohne Dev-Dependencies)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+# PHP-Abhängigkeiten installieren (inkl. Dev-Dependencies für Developer Mode)
+RUN composer install --optimize-autoloader --no-interaction --no-scripts
 
 # Anwendungsdateien kopieren
 COPY . .

@@ -5,11 +5,13 @@ services:
     ports:
       - "8443:80"
     volumes:
+      - ./.env:/var/www/html/.env:ro
       - tls-data:/var/www/html/data
       - tls-logs:/var/www/html/var/log
     environment:
       - TZ=Europe/Berlin
-      - APP_ENV=prod
+      - APP_ENV=dev
+      - APP_DEBUG=1
       - APP_SECRET=${APP_SECRET:-changeme_use_a_random_32_char_secret}
       - DATABASE_URL=sqlite:////var/www/html/data/tls_monitor.sqlite
       - MAILER_DSN=${MAILER_DSN:-null://null}
