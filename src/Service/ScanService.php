@@ -2,37 +2,130 @@
 
 namespace App\Service;
 
-use App\Model\Domain;
-use App\Model\Finding;
-use App\Model\ScanRun;
+use App\Entity\Domain;
+use App\Entity\Finding;
+use App\Entity\ScanRun;
+use App\Repository\DomainRepository;
+use App\Repository\FindingRepository;
+use App\Repository\ScanRunRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 
 class ScanService
 {
-    private static function log(string $message): void
-    {
-        $logFile = __DIR__ . '/../../logs/scan.log';
-        $logDir = dirname($logFile);
-        if (!is_dir($logDir)) {
-            mkdir($logDir, 0755, true);
-        }
-        $timestamp = date('Y-m-d H:i:s');
-        file_put_contents($logFile, "[$timestamp] $message\n", FILE_APPEND);
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly DomainRepository $domainRepository,
+        private readonly FindingRepository $findingRepository,
+        private readonly ScanRunRepository $scanRunRepository,
+        private readonly MailService $mailService,
+        private readonly LoggerInterface $logger,
+        private readonly int $scanTimeout = 10,
+        private readonly int $retryDelay = 5,
+        private readonly int $retryCount = 1,
+        private readonly bool $notifyOnUnreachable = false,
+        private readonly int $minRsaKeyBits = 2048,
+    ) {
     }
 
-    public static function scanDomain(array $domain): array
+    public function runFullScan(): ScanRun
     {
-        $fqdn = $domain['fqdn'];
-        $port = (int) $domain['port'];
+        $domains = $this->domainRepository->findActive();
+
+        $scanRun = new ScanRun();
+        $this->entityManager->persist($scanRun);
+        $this->entityManager->flush();
+
+        if (empty($domains)) {
+            $this->logger->info('Keine aktiven Domains zu scannen.');
+            $scanRun->finish('success');
+            $this->entityManager->flush();
+            return $scanRun;
+        }
+
+        $this->logger->info("Scan-Run #{$scanRun->getId()} gestartet mit " . count($domains) . " Domains.");
+
+        $hasErrors = false;
+        $allFailed = true;
+
+        foreach ($domains as $domain) {
+            try {
+                $scanFindings = $this->scanDomain($domain);
+                $this->persistFindings($domain, $scanRun, $scanFindings);
+
+                $allFailed = false;
+                foreach ($scanFindings as $f) {
+                    if (in_array($f['finding_type'], ['UNREACHABLE', 'ERROR'])) {
+                        $hasErrors = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                $this->logger->error("Fehler beim Scannen von {$domain->getFqdn()}:{$domain->getPort()}: " . $e->getMessage());
+                $hasErrors = true;
+
+                $finding = new Finding();
+                $finding->setDomain($domain);
+                $finding->setScanRun($scanRun);
+                $finding->setFindingType('ERROR');
+                $finding->setSeverity('low');
+                $finding->setDetails(['error' => $e->getMessage()]);
+                $finding->setStatus('new');
+                $this->entityManager->persist($finding);
+                $this->entityManager->flush();
+            }
+        }
+
+        $status = $allFailed ? 'failed' : ($hasErrors ? 'partial' : 'success');
+        $scanRun->finish($status);
+        $this->entityManager->flush();
+
+        $this->logger->info("Scan-Run #{$scanRun->getId()} beendet mit Status: {$status}");
+
+        return $scanRun;
+    }
+
+    public function runSingleScan(Domain $domain): array
+    {
+        if (!$domain->isActive()) {
+            throw new \RuntimeException('Deaktivierte Domains können nicht gescannt werden.');
+        }
+
+        $scanRun = new ScanRun();
+        $this->entityManager->persist($scanRun);
+        $this->entityManager->flush();
+
+        $scanFindings = $this->scanDomain($domain);
+        $findings = $this->persistFindings($domain, $scanRun, $scanFindings);
+
+        $hasErrors = false;
+        foreach ($scanFindings as $f) {
+            if (in_array($f['finding_type'], ['UNREACHABLE', 'ERROR'])) {
+                $hasErrors = true;
+            }
+        }
+
+        $scanRun->finish($hasErrors ? 'partial' : 'success');
+        $this->entityManager->flush();
+
+        return $findings;
+    }
+
+    /**
+     * @return array<array{finding_type: string, severity: string, details: array}>
+     */
+    public function scanDomain(Domain $domain): array
+    {
+        $fqdn = $domain->getFqdn();
+        $port = $domain->getPort();
         $findings = [];
 
-        $result = self::performTlsCheck($fqdn, $port);
+        $result = $this->performTlsCheck($fqdn, $port);
 
         if ($result === null) {
-            // Retry logic
-            for ($retry = 1; $retry <= RETRY_COUNT; $retry++) {
-                self::log("Retry $retry/" . RETRY_COUNT . " für {$fqdn}:{$port}");
-                sleep(RETRY_DELAY);
-                $result = self::performTlsCheck($fqdn, $port);
+            for ($retry = 1; $retry <= $this->retryCount; $retry++) {
+                $this->logger->info("Retry {$retry}/{$this->retryCount} für {$fqdn}:{$port}");
+                sleep($this->retryDelay);
+                $result = $this->performTlsCheck($fqdn, $port);
                 if ($result !== null) {
                     break;
                 }
@@ -55,10 +148,11 @@ class ScanService
             ]];
         }
 
-        // Check certificate expiry
+        // Certificate expiry check
+        $daysRemaining = null;
         if (isset($result['valid_to'])) {
-            $expiryDate = new \DateTime($result['valid_to']);
-            $now = new \DateTime();
+            $expiryDate = new \DateTimeImmutable($result['valid_to']);
+            $now = new \DateTimeImmutable();
             $daysRemaining = (int) $now->diff($expiryDate)->format('%r%a');
 
             if ($daysRemaining < 0) {
@@ -108,7 +202,7 @@ class ScanService
             }
         }
 
-        // Check TLS version
+        // TLS version check
         if (isset($result['protocol'])) {
             $insecureProtocols = ['TLSv1', 'TLSv1.0', 'TLSv1.1', 'SSLv3', 'SSLv2'];
             if (in_array($result['protocol'], $insecureProtocols)) {
@@ -123,33 +217,30 @@ class ScanService
             }
         }
 
-        // Check certificate chain
+        // Certificate chain check
         if (!empty($result['chain_error'])) {
             $findings[] = [
                 'finding_type' => 'CHAIN_ERROR',
                 'severity'     => 'high',
-                'details'      => [
-                    'error' => $result['chain_error'],
-                ],
+                'details'      => ['error' => $result['chain_error']],
             ];
         }
 
-        // Check RSA public-key length (if certificate uses RSA)
+        // RSA key length check
         if (isset($result['public_key_type']) && strtoupper($result['public_key_type']) === 'RSA' && isset($result['public_key_bits'])) {
             $bits = (int) $result['public_key_bits'];
-            if ($bits < MIN_RSA_KEY_BITS) {
+            if ($bits < $this->minRsaKeyBits) {
                 $findings[] = [
                     'finding_type' => 'RSA_KEY_LENGTH',
                     'severity'     => ($bits < 1024 ? 'critical' : 'high'),
                     'details'      => [
                         'key_bits' => $bits,
-                        'message'  => "RSA-Schlüssellänge zu kurz: {$bits} bits (empfohlen >= " . MIN_RSA_KEY_BITS . ")",
+                        'message'  => "RSA-Schlüssellänge zu kurz: {$bits} bits (empfohlen >= {$this->minRsaKeyBits})",
                     ],
                 ];
             }
         }
 
-        // If no problems found, add OK finding
         if (empty($findings)) {
             $findings[] = [
                 'finding_type' => 'OK',
@@ -161,7 +252,7 @@ class ScanService
                     'cipher_version'  => $result['cipher_version'] ?? null,
                     'valid_to'        => $result['valid_to'] ?? 'unknown',
                     'valid_from'      => $result['valid_from'] ?? 'unknown',
-                    'days_remaining'  => $daysRemaining ?? null,
+                    'days_remaining'  => $daysRemaining,
                     'subject'         => $result['subject'] ?? '',
                     'issuer'          => $result['issuer'] ?? '',
                     'public_key_type' => $result['public_key_type'] ?? null,
@@ -173,7 +264,59 @@ class ScanService
         return $findings;
     }
 
-    private static function performTlsCheck(string $fqdn, int $port): ?array
+    /**
+     * @param array<array{finding_type: string, severity: string, details: array}> $scanFindings
+     * @return array<array{finding_type: string, severity: string, details: array, id: int, status: string}>
+     */
+    private function persistFindings(Domain $domain, ScanRun $scanRun, array $scanFindings): array
+    {
+        $results = [];
+
+        foreach ($scanFindings as $rawFinding) {
+            $isKnown = $this->findingRepository->isKnownFinding(
+                $domain->getId(),
+                $rawFinding['finding_type'],
+                $scanRun->getId()
+            );
+            $status = $isKnown ? 'known' : 'new';
+
+            $finding = new Finding();
+            $finding->setDomain($domain);
+            $finding->setScanRun($scanRun);
+            $finding->setFindingType($rawFinding['finding_type']);
+            $finding->setSeverity($rawFinding['severity']);
+            $finding->setDetails($rawFinding['details']);
+            $finding->setStatus($status);
+            $this->entityManager->persist($finding);
+
+            if ($status === 'new' && in_array($rawFinding['severity'], ['high', 'critical'])) {
+                $shouldNotify = !in_array($rawFinding['finding_type'], ['UNREACHABLE', 'ERROR'])
+                    || $this->notifyOnUnreachable;
+
+                if ($shouldNotify) {
+                    $this->mailService->sendFindingAlert($domain, $finding);
+                }
+            }
+
+            $results[] = array_merge($rawFinding, ['status' => $status]);
+        }
+
+        // Resolve previous findings that no longer appear
+        $currentFindingTypes = array_column($scanFindings, 'finding_type');
+        $previousFindings = $this->findingRepository->findPreviousRunFindings($domain->getId(), $scanRun->getId());
+
+        foreach ($previousFindings as $prevFinding) {
+            if (!in_array($prevFinding->getFindingType(), $currentFindingTypes)) {
+                $prevFinding->markResolved();
+            }
+        }
+
+        $this->entityManager->flush();
+
+        return $results;
+    }
+
+    private function performTlsCheck(string $fqdn, int $port): ?array
     {
         $context = stream_context_create([
             'ssl' => [
@@ -194,24 +337,21 @@ class ScanService
                 "ssl://{$fqdn}:{$port}",
                 $errno,
                 $errstr,
-                SCAN_TIMEOUT,
+                $this->scanTimeout,
                 STREAM_CLIENT_CONNECT,
                 $context
             );
 
             if ($stream === false) {
                 if ($errno === 0 || stripos($errstr, 'timed out') !== false) {
-                    self::log("UNREACHABLE: {$fqdn}:{$port} - $errstr");
-                    return null; // Triggers retry
+                    $this->logger->info("UNREACHABLE: {$fqdn}:{$port} - {$errstr}");
+                    return null;
                 }
 
-                // Try to get more details about the error
                 $sslError = openssl_error_string();
                 if ($sslError && stripos($sslError, 'certificate') !== false) {
-                    // Certificate chain error but we can still get cert info
-                    $result['chain_error'] = $errstr . ($sslError ? " ($sslError)" : '');
+                    $result['chain_error'] = $errstr . ($sslError ? " ({$sslError})" : '');
 
-                    // Try again without verification to get cert details
                     $contextNoVerify = stream_context_create([
                         'ssl' => [
                             'capture_peer_cert' => true,
@@ -225,7 +365,7 @@ class ScanService
                         "ssl://{$fqdn}:{$port}",
                         $errno2,
                         $errstr2,
-                        SCAN_TIMEOUT,
+                        $this->scanTimeout,
                         STREAM_CLIENT_CONNECT,
                         $contextNoVerify
                     );
@@ -242,7 +382,6 @@ class ScanService
                                 $result['issuer'] = $certInfo['issuer']['CN'] ?? '';
                             }
 
-                            // Extract public key details (type + bits) when available
                             $pubKey = @openssl_pkey_get_public($certPem);
                             if ($pubKey !== false) {
                                 $keyDetails = openssl_pkey_get_details($pubKey);
@@ -258,6 +397,7 @@ class ScanService
                                 }
                             }
                         }
+
                         $meta = stream_get_meta_data($streamRetry);
                         $result['protocol'] = $meta['crypto']['protocol'] ?? 'unknown';
                         $result['cipher_name'] = $meta['crypto']['cipher_name'] ?? 'unknown';
@@ -269,23 +409,18 @@ class ScanService
                     return $result;
                 }
 
-                self::log("ERROR: {$fqdn}:{$port} - $errstr");
-                return ['error' => $errstr . ($sslError ? " ($sslError)" : '')];
+                $this->logger->info("ERROR: {$fqdn}:{$port} - {$errstr}");
+                return ['error' => $errstr . ($sslError ? " ({$sslError})" : '')];
             }
 
-            // Successful connection
             $params = stream_context_get_params($stream);
             $meta = stream_get_meta_data($stream);
 
-            // Get protocol version
             $result['protocol'] = $meta['crypto']['protocol'] ?? 'unknown';
-            
-            // Get cipher suite
             $result['cipher_name'] = $meta['crypto']['cipher_name'] ?? 'unknown';
             $result['cipher_bits'] = $meta['crypto']['cipher_bits'] ?? null;
             $result['cipher_version'] = $meta['crypto']['cipher_version'] ?? null;
 
-            // Parse certificate
             if (isset($params['options']['ssl']['peer_certificate'])) {
                 $certPem = $params['options']['ssl']['peer_certificate'];
                 $certInfo = openssl_x509_parse($certPem);
@@ -297,9 +432,7 @@ class ScanService
                     $result['serial'] = $certInfo['serialNumberHex'] ?? '';
                 }
 
-                // Extract public key details (type + bits) when available
                 $pubKey = false;
-                // If cert is a resource, export to PEM first; otherwise try directly
                 if (is_resource($certPem) || is_object($certPem)) {
                     $pem = '';
                     if (openssl_x509_export($certPem, $pem)) {
@@ -325,145 +458,15 @@ class ScanService
             }
 
             fclose($stream);
-            self::log("OK: {$fqdn}:{$port} - TLS check successful");
+            $this->logger->info("OK: {$fqdn}:{$port} - TLS-Check erfolgreich");
             return $result;
 
-        } catch (\Exception $e) {
-            self::log("EXCEPTION: {$fqdn}:{$port} - " . $e->getMessage());
+        } catch (\Throwable $e) {
+            $this->logger->error("EXCEPTION: {$fqdn}:{$port} - " . $e->getMessage());
             if (stripos($e->getMessage(), 'timed out') !== false) {
                 return null;
             }
             return ['error' => $e->getMessage()];
         }
-    }
-
-    public static function runFullScan(): int
-    {
-        $domains = Domain::findActive();
-        if (empty($domains)) {
-            self::log("No active domains to scan.");
-            return 0;
-        }
-
-        $runId = ScanRun::create();
-        self::log("Scan run #$runId started with " . count($domains) . " domains.");
-
-        $hasErrors = false;
-        $allFailed = true;
-
-        foreach ($domains as $domain) {
-            try {
-                $scanFindings = self::scanDomain($domain);
-
-                foreach ($scanFindings as $finding) {
-                    $isKnown = Finding::isKnownFinding($domain['id'], $finding['finding_type'], $runId);
-                    $status = $isKnown ? 'known' : 'new';
-
-                    Finding::create(
-                        $domain['id'],
-                        $runId,
-                        $finding['finding_type'],
-                        $finding['severity'],
-                        $finding['details'],
-                        $status
-                    );
-
-                    // Send email for new high/critical findings
-                    if ($status === 'new' && in_array($finding['severity'], ['high', 'critical'])) {
-                        if ($finding['finding_type'] !== 'UNREACHABLE' && $finding['finding_type'] !== 'ERROR') {
-                            MailService::sendFindingAlert($domain, $finding);
-                        } elseif (NOTIFY_ON_UNREACHABLE) {
-                            MailService::sendFindingAlert($domain, $finding);
-                        }
-                    }
-                }
-
-                // Resolve previous findings that no longer appear
-                $currentFindingTypes = array_column($scanFindings, 'finding_type');
-                $previousFindings = Finding::findPreviousRunFindings($domain['id'], $runId);
-                foreach ($previousFindings as $prevFinding) {
-                    if (!in_array($prevFinding['finding_type'], $currentFindingTypes)) {
-                        Finding::markResolved($prevFinding['id']);
-                    }
-                }
-
-                $allFailed = false;
-                $hasProblem = false;
-                foreach ($scanFindings as $f) {
-                    if (in_array($f['finding_type'], ['UNREACHABLE', 'ERROR'])) {
-                        $hasErrors = true;
-                        $hasProblem = true;
-                    }
-                }
-            } catch (\Exception $e) {
-                self::log("Error scanning {$domain['fqdn']}:{$domain['port']}: " . $e->getMessage());
-                $hasErrors = true;
-                Finding::create($domain['id'], $runId, 'ERROR', 'low', ['error' => $e->getMessage()], 'new');
-            }
-        }
-
-        $status = $allFailed ? 'failed' : ($hasErrors ? 'partial' : 'success');
-        ScanRun::finish($runId, $status);
-        self::log("Scan run #$runId finished with status: $status");
-
-        return $runId;
-    }
-
-    public static function runSingleScan(int $domainId): array
-    {
-        $domain = Domain::findById($domainId);
-        if (!$domain) {
-            throw new \RuntimeException("Domain nicht gefunden.");
-        }
-        if ($domain['status'] !== 'active') {
-            throw new \RuntimeException("Deaktivierte Domains können nicht gescannt werden.");
-        }
-
-        $runId = ScanRun::create();
-        $scanFindings = self::scanDomain($domain);
-        $results = [];
-
-        foreach ($scanFindings as $finding) {
-            $isKnown = Finding::isKnownFinding($domain['id'], $finding['finding_type'], $runId);
-            $status = $isKnown ? 'known' : 'new';
-
-            $findingId = Finding::create(
-                $domain['id'],
-                $runId,
-                $finding['finding_type'],
-                $finding['severity'],
-                $finding['details'],
-                $status
-            );
-
-            if ($status === 'new' && in_array($finding['severity'], ['high', 'critical'])) {
-                if ($finding['finding_type'] !== 'UNREACHABLE' && $finding['finding_type'] !== 'ERROR') {
-                    MailService::sendFindingAlert($domain, $finding);
-                } elseif (NOTIFY_ON_UNREACHABLE) {
-                    MailService::sendFindingAlert($domain, $finding);
-                }
-            }
-
-            $results[] = array_merge($finding, ['id' => $findingId, 'status' => $status]);
-        }
-
-        // Resolve previous findings
-        $currentFindingTypes = array_column($scanFindings, 'finding_type');
-        $previousFindings = Finding::findPreviousRunFindings($domain['id'], $runId);
-        foreach ($previousFindings as $prevFinding) {
-            if (!in_array($prevFinding['finding_type'], $currentFindingTypes)) {
-                Finding::markResolved($prevFinding['id']);
-            }
-        }
-
-        $hasErrors = false;
-        foreach ($scanFindings as $f) {
-            if (in_array($f['finding_type'], ['UNREACHABLE', 'ERROR'])) {
-                $hasErrors = true;
-            }
-        }
-        ScanRun::finish($runId, $hasErrors ? 'partial' : 'success');
-
-        return $results;
     }
 }

@@ -1,0 +1,136 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}TLS Monitor – Domains{% endblock %}
+
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-globe"></i> Domains</h2>
+    {% if is_granted('ROLE_ADMIN') %}
+        <a href="{{ path('domain_new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Domain anlegen
+        </a>
+    {% endif %}
+</div>
+
+{% if scan_results is defined and scan_results %}
+    <div class="alert alert-info alert-dismissible fade show">
+        <strong>Scan-Ergebnisse:</strong>
+        <ul class="mb-0 mt-1">
+            {% for result in scan_results %}
+                <li>
+                    {% set severityClass = {'critical': 'danger', 'high': 'warning', 'medium': 'info', 'low': 'secondary'} %}
+                    <span class="badge bg-{{ severityClass[result.severity] ?? 'success' }}">{{ result.severity }}</span>
+                    <strong>{{ result.finding_type }}</strong>
+                    {% if result.finding_type == 'OK' and result.details %}
+                        <div class="small mt-1 text-muted">
+                            {% if result.details.protocol is defined %}
+                                <i class="bi bi-shield-check"></i> <strong>Protokoll:</strong> {{ result.details.protocol }}<br>
+                            {% endif %}
+                            {% if result.details.cipher_name is defined %}
+                                <i class="bi bi-key"></i> <strong>Cipher:</strong> {{ result.details.cipher_name }}
+                                {% if result.details.cipher_bits is defined %}({{ result.details.cipher_bits }} bits){% endif %}<br>
+                            {% endif %}
+                            {% if result.details.public_key_type is defined and result.details.public_key_bits is defined %}
+                                <i class="bi bi-key-fill"></i> <strong>Key:</strong> {{ result.details.public_key_type }} {{ result.details.public_key_bits }} bits<br>
+                            {% endif %}
+                            {% if result.details.valid_to is defined %}
+                                <i class="bi bi-calendar-check"></i> <strong>Gültig bis:</strong> {{ result.details.valid_to }}
+                                {% if result.details.days_remaining is defined %}(noch {{ result.details.days_remaining }} Tage){% endif %}<br>
+                            {% endif %}
+                            {% if result.details.subject is defined %}
+                                <i class="bi bi-file-earmark-text"></i> <strong>Zertifikat:</strong> {{ result.details.subject }}
+                            {% endif %}
+                        </div>
+                    {% elseif result.details.expiry_date is defined %}
+                        <div class="small mt-1">
+                            Läuft ab: {{ result.details.expiry_date }}
+                            {% if result.details.days_remaining is defined %}({{ result.details.days_remaining }} Tage){% endif %}
+                        </div>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endif %}
+
+{% if domains is empty %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Noch keine Domains vorhanden.
+        {% if is_granted('ROLE_ADMIN') %}
+            <a href="{{ path('domain_new') }}">Jetzt erste Domain anlegen.</a>
+        {% endif %}
+    </div>
+{% else %}
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>FQDN</th>
+                    <th>Port</th>
+                    <th>Beschreibung</th>
+                    <th>Status</th>
+                    <th>Erstellt</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for domain in domains %}
+                    <tr class="{{ domain.status == 'inactive' ? 'text-muted' : '' }}">
+                        <td>{{ domain.fqdn }}</td>
+                        <td>{{ domain.port }}</td>
+                        <td>{{ domain.description ?? '–' }}</td>
+                        <td>
+                            {% if domain.active %}
+                                <span class="badge bg-success">Aktiv</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inaktiv</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ domain.createdAt ? domain.createdAt|date('Y-m-d H:i') : '' }}</td>
+                        <td>
+                            {% if is_granted('ROLE_ADMIN') %}
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ path('domain_edit', {id: domain.id}) }}"
+                                       class="btn btn-outline-primary" title="Bearbeiten">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+
+                                    <form method="POST" action="{{ path('domain_toggle', {id: domain.id}) }}" class="d-inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('toggle-domain-' ~ domain.id) }}">
+                                        <button type="submit"
+                                                class="btn btn-outline-{{ domain.active ? 'warning' : 'success' }}"
+                                                title="{{ domain.active ? 'Deaktivieren' : 'Reaktivieren' }}">
+                                            <i class="bi bi-{{ domain.active ? 'pause-circle' : 'play-circle' }}"></i>
+                                        </button>
+                                    </form>
+
+                                    <form method="POST" action="{{ path('domain_scan', {id: domain.id}) }}" class="d-inline">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('scan-domain-' ~ domain.id) }}">
+                                        <button type="submit"
+                                                class="btn btn-outline-info"
+                                                {{ not domain.active ? 'disabled' : '' }}
+                                                title="{{ not domain.active ? 'Scan für deaktivierte Domains nicht möglich' : 'Jetzt scannen' }}">
+                                            <i class="bi bi-search"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block javascripts %}
+<script>
+// Clear scan results from session after displaying
+{% if scan_results is defined and scan_results %}
+    // Prevent re-display on refresh
+    history.replaceState(null, '', window.location.pathname);
+{% endif %}
+</script>
+{% endblock %}
