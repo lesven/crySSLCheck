@@ -15,6 +15,13 @@ else
 	DEBUG_FLAG="--no-debug"
 fi
 
+# if the project is bind‑mounted we might not have installed dependencies yet
+if [ ! -d /var/www/html/vendor ] || [ -z "$(ls -A /var/www/html/vendor)" ]; then
+    echo "Installing composer dependencies…"
+    cd /var/www/html
+    composer install --no-interaction --optimize-autoloader || true
+fi
+
 # Symfony Cache warmup
 php /var/www/html/bin/console cache:warmup --env="$APP_ENV" $DEBUG_FLAG
 
