@@ -114,6 +114,14 @@
                                             <i class="bi bi-search"></i>
                                         </button>
                                     </form>
+
+                                    <form method="POST" action="{{ path('domain_delete', {id: domain.id}) }}" class="d-inline"
+                                          onsubmit="return confirm('Domain „{{ domain.fqdn|e('js') }}" wirklich löschen?')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete-domain-' ~ domain.id) }}">
+                                        <button type="submit" class="btn btn-outline-danger" title="Löschen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
                                 </div>
                             {% endif %}
                         </td>

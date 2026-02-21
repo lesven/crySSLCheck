@@ -132,4 +132,25 @@ class DomainController extends AbstractController
         $this->addFlash('success', 'Domain-Status erfolgreich geändert.');
         return $this->redirectToRoute('domain_index');
     }
+
+    #[Route('/{id}/delete', name: 'domain_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function delete(int $id, Request $request): Response
+    {
+        $domain = $this->domainRepository->find($id);
+        if (!$domain) {
+            throw $this->createNotFoundException('Domain nicht gefunden.');
+        }
+
+        if (!$this->isCsrfTokenValid('delete-domain-' . $id, $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Ungültiges CSRF-Token.');
+            return $this->redirectToRoute('domain_index');
+        }
+
+        $this->entityManager->remove($domain);
+        $this->entityManager->flush();
+
+        $this->addFlash('success', 'Domain erfolgreich gelöscht.');
+        return $this->redirectToRoute('domain_index');
+    }
 }
