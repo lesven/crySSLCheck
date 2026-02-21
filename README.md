@@ -3,6 +3,24 @@
 **Tech-Stack:** PHP (plain), SQLite, Bootstrap 5, OS-Cronjob, PHPMailer  
 **Ziel:** Lauffähiger POC mit Kernfunktion „Domain eintragen → automatisch scannen → bei Problem per Mail informieren → Ergebnis einsehen."
 
+**Entwicklung**
+
+Das Projekt wird in einem Docker‑Image ausgeliefert. Für die Entwicklung binden wir
+jedoch das Quellverzeichnis in den Container ein (`docker-compose` verwendet
+`- ./:/var/www/html:delegated`). Änderungen im Host-Dateisystem wirken sofort –
+kein wiederholtes `make install`/`make build` nötig.
+
+> ⚠️ Da das Bind‑Mount das im Image vorhandene `vendor/`-Verzeichnis überdeckt,
+müssen die PHP‑Abhängigkeiten auf dem Host installiert werden (oder der
+Container erledigt das beim Start; die Entrypoint‑Skript prüft nun automatisch
+auf fehlende `vendor/` und führt `composer install` aus).
+
+```sh
+# ab jetzt zum ersten Start bzw. nach Anpassung des Compose-Files:
+make install   # baut das Image und startet Container
+make restart   # startet Container neu, der Mount bleibt bestehen
+```
+
 ---
 
 ## Inhaltsverzeichnis

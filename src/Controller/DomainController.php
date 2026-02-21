@@ -37,6 +37,111 @@ class DomainController extends AbstractController
         ]);
     }
 
+    #[Route('/import', name: 'domain_import', methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function import(Request $request): Response
+    {
+        $results = null;
+
+        if ($request->isMethod('POST')) {
+            $file = $request->files->get('csv_file');
+
+            if (!$file || !$file->isValid()) {
+                $this->addFlash('danger', 'Bitte eine gültige CSV-Datei hochladen.');
+                return $this->redirectToRoute('domain_import');
+            }
+
+            $results = ['created' => 0, 'updated' => 0, 'errors' => []];
+            $handle = fopen($file->getPathname(), 'r');
+
+            if ($handle === false) {
+                $this->addFlash('danger', 'Datei konnte nicht gelesen werden.');
+                return $this->redirectToRoute('domain_import');
+            }
+
+            try {
+                $header = fgetcsv($handle);
+                if ($header === false) {
+                    $this->addFlash('danger', 'CSV-Datei ist leer oder ungültig.');
+                    return $this->redirectToRoute('domain_import');
+                }
+
+                // Normalize header keys (trim + lowercase)
+                $header = array_map(fn (string $h) => strtolower(trim($h)), $header);
+
+                $fqdnCol        = array_search('fqdn', $header, true);
+                $portCol        = array_search('port', $header, true);
+                $descriptionCol = array_search('beschreibung', $header, true);
+                $statusCol      = array_search('status', $header, true);
+
+                if ($fqdnCol === false || $portCol === false) {
+                    $this->addFlash('danger', 'CSV muss mindestens die Spalten "FQDN" und "Port" enthalten.');
+                    return $this->redirectToRoute('domain_import');
+                }
+
+                $lineNumber = 1;
+                while (($row = fgetcsv($handle)) !== false) {
+                    ++$lineNumber;
+
+                    if (empty(array_filter($row, fn ($v) => $v !== null && $v !== ''))) {
+                        continue;
+                    }
+
+                    $fqdn = trim($row[$fqdnCol] ?? '');
+                    $port = isset($row[$portCol]) ? (int) trim($row[$portCol]) : 0;
+
+                    $validationErrors = $this->validationService->validateDomainForImport($fqdn, $port);
+                    if (!empty($validationErrors)) {
+                        $results['errors'][] = sprintf('Zeile %d (%s:%d): %s', $lineNumber, $fqdn, $port, implode(', ', $validationErrors));
+                        continue;
+                    }
+
+                    $description = null;
+                    if ($descriptionCol !== false) {
+                        $rawDescription = trim($row[$descriptionCol] ?? '');
+                        $description    = $rawDescription !== '' ? $rawDescription : null;
+                    }
+
+                    $status = null;
+                    if ($statusCol !== false) {
+                        $rawStatus = strtolower(trim($row[$statusCol] ?? ''));
+                        $status    = in_array($rawStatus, ['active', 'inactive'], true) ? $rawStatus : null;
+                    }
+
+                    $existing = $this->domainRepository->findOneBy(['fqdn' => $fqdn, 'port' => $port]);
+
+                    if ($existing !== null) {
+                        if ($descriptionCol !== false) {
+                            $existing->setDescription($description);
+                        }
+                        if ($status !== null) {
+                            $existing->setStatus($status);
+                        }
+                        ++$results['updated'];
+                    } else {
+                        $domain = new Domain();
+                        $domain->setFqdn($fqdn);
+                        $domain->setPort($port);
+                        $domain->setDescription($description);
+                        if ($status !== null) {
+                            $domain->setStatus($status);
+                        }
+                        $this->entityManager->persist($domain);
+                        ++$results['created'];
+                    }
+                }
+            } finally {
+                fclose($handle);
+            }
+
+            $this->entityManager->flush();
+        }
+
+        return $this->render('domain/import.html.twig', [
+            'results' => $results,
+        ]);
+    }
+
     #[Route('/export', name: 'domain_export', methods: ['GET'])]
     #[IsGranted('ROLE_ADMIN')]
     public function export(): StreamedResponse

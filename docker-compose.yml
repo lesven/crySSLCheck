@@ -5,6 +5,8 @@ services:
     ports:
       - "8443:80"
     volumes:
+      # bind the project directory into the container for fast development
+      - ./:/var/www/html:delegated
       - ./.env:/var/www/html/.env:ro
       - tls-data:/var/www/html/data
       - tls-logs:/var/www/html/var/log
