@@ -1,0 +1,43 @@
+# This file is the entry point to configure your own services.
+# Files in the packages/ subdirectory configure your dependencies.
+
+parameters:
+    app.scan_timeout: '%env(int:SCAN_TIMEOUT)%'
+    app.retry_delay: '%env(int:RETRY_DELAY)%'
+    app.retry_count: '%env(int:RETRY_COUNT)%'
+    app.notify_on_unreachable: '%env(bool:NOTIFY_ON_UNREACHABLE)%'
+    app.min_rsa_key_bits: '%env(int:MIN_RSA_KEY_BITS)%'
+    app.allow_ip_addresses: '%env(bool:ALLOW_IP_ADDRESSES)%'
+    app.mailer_from_email: '%env(MAILER_FROM_EMAIL)%'
+    app.mailer_from_name: '%env(MAILER_FROM_NAME)%'
+    app.alert_recipients: '%env(csv:ALERT_RECIPIENTS)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    App\Service\ScanService:
+        arguments:
+            $scanTimeout: '%app.scan_timeout%'
+            $retryDelay: '%app.retry_delay%'
+            $retryCount: '%app.retry_count%'
+            $notifyOnUnreachable: '%app.notify_on_unreachable%'
+            $minRsaKeyBits: '%app.min_rsa_key_bits%'
+
+    App\Service\MailService:
+        arguments:
+            $fromEmail: '%app.mailer_from_email%'
+            $fromName: '%app.mailer_from_name%'
+            $alertRecipients: '%app.alert_recipients%'
+
+    App\Service\ValidationService:
+        arguments:
+            $allowIpAddresses: '%app.allow_ip_addresses%'

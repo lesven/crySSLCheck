@@ -6,9 +6,22 @@ services:
       - "8443:80"
     volumes:
       - tls-data:/var/www/html/data
-      - tls-logs:/var/www/html/logs
+      - tls-logs:/var/www/html/var/log
     environment:
       - TZ=Europe/Berlin
+      - APP_ENV=prod
+      - APP_SECRET=${APP_SECRET:-changeme_use_a_random_32_char_secret}
+      - DATABASE_URL=sqlite:////var/www/html/data/tls_monitor.sqlite
+      - MAILER_DSN=${MAILER_DSN:-null://null}
+      - MAILER_FROM_EMAIL=${MAILER_FROM_EMAIL:-tls-monitor@example.com}
+      - MAILER_FROM_NAME=${MAILER_FROM_NAME:-TLS Monitor}
+      - ALERT_RECIPIENTS=${ALERT_RECIPIENTS:-}
+      - SCAN_TIMEOUT=${SCAN_TIMEOUT:-10}
+      - RETRY_DELAY=${RETRY_DELAY:-5}
+      - RETRY_COUNT=${RETRY_COUNT:-1}
+      - NOTIFY_ON_UNREACHABLE=${NOTIFY_ON_UNREACHABLE:-false}
+      - MIN_RSA_KEY_BITS=${MIN_RSA_KEY_BITS:-2048}
+      - ALLOW_IP_ADDRESSES=${ALLOW_IP_ADDRESSES:-true}
     restart: unless-stopped
 
 volumes:

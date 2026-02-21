@@ -40,38 +40,32 @@ rebuild: ## Führt clean, build und up aus
 	make up
 
 scan: ## Führt einen manuellen Scan aus
-	docker compose exec tls-monitor php /var/www/html/cli/scan.php
+	docker compose exec tls-monitor php /var/www/html/bin/console app:scan
 
 scan-force: ## Führt einen manuellen Scan aus (erzwingt Scan auch wenn heute bereits erfolgreich)
-	docker compose exec tls-monitor php /var/www/html/cli/scan.php --force
+	docker compose exec tls-monitor php /var/www/html/bin/console app:scan --force
 
-create-user: ## Erstellt einen neuen Benutzer (Übergabe: ARGS="user pass role"  oder USERNAME/PASSWORD/ROLE)
-	@if [ -n "$(ARGS)" ]; then \
-		docker compose exec tls-monitor php /var/www/html/cli/create_user.php $(ARGS); \
-	elif [ -n "$(USERNAME)" ] && [ -n "$(PASSWORD)" ]; then \
+create-user: ## Erstellt einen neuen Benutzer (Übergabe: USERNAME=user PASSWORD=pass [ROLE=admin|auditor])
+	@if [ -n "$(USERNAME)" ] && [ -n "$(PASSWORD)" ]; then \
 		ROLE=$${ROLE:-auditor}; \
-		docker compose exec tls-monitor php /var/www/html/cli/create_user.php "$(USERNAME)" "$(PASSWORD)" "$$ROLE"; \
+		docker compose exec tls-monitor php /var/www/html/bin/console app:create-user "$(USERNAME)" "$(PASSWORD)" --role="$$ROLE"; \
 	else \
-		@echo "Usage: make create-user USERNAME=<user> PASSWORD=<pass> [ROLE=admin|auditor]"; \
-		@echo "       make create-user ARGS=\"user pass role\""; \
-		@echo "       (oder direkt: docker compose exec tls-monitor php /var/www/html/cli/create_user.php user pass role)"; \
+		echo "Usage: make create-user USERNAME=<user> PASSWORD=<pass> [ROLE=admin|auditor]"; \
 		false; \
 	fi
 
-db-backup: ## Erstellt ein Backup der Datenbank
-	docker compose exec tls-monitor cp /var/www/html/data/database.sqlite /var/www/html/data/database.sqlite.backup.$(shell date +%Y%m%d_%H%M%S)
+console: ## Führt eine Symfony-Konsolen-Befehl aus (Übergabe: CMD="befehl")
+	docker compose exec tls-monitor php /var/www/html/bin/console $(CMD)
 
-db-restore: ## Stellt das neueste Backup wieder her
-	@echo "Verfügbare Backups:"
-	@docker compose exec tls-monitor ls -lh /var/www/html/data/database.sqlite.backup.* 2>/dev/null || echo "Keine Backups gefunden"
+db-backup: ## Erstellt ein Backup der Datenbank
+	docker compose exec tls-monitor cp /var/www/html/data/tls_monitor.sqlite /var/www/html/data/tls_monitor.sqlite.backup.$(shell date +%Y%m%d_%H%M%S)
 
 install: ## Initialisiert das Projekt (Build + Up)
 	make build
 	make up
 	@echo ""
-	@echo "✓ Container gestartet!"
-	@echo "✓ Anwendung läuft auf: http://localhost:8443"
+	@echo "Container gestartet!"
+	@echo "Anwendung läuft auf: http://localhost:8443"
+	@echo "Standard-Login: admin / admin"
 	@echo ""
-	@echo "Nächste Schritte:"
-	@echo "  1. Erstelle einen Benutzer: make create-user"
-	@echo "  2. Öffne http://localhost:8443 im Browser"
+	@echo "Benutzer erstellen: make create-user USERNAME=alice PASSWORD=secret ROLE=admin"
