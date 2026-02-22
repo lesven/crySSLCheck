@@ -23,6 +23,14 @@
             <a href="{{ path('domain_new') }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg"></i> Domain anlegen
             </a>
+            {% if domains is not empty %}
+                <button type="button" class="btn btn-danger"
+                        data-bs-toggle="modal" data-bs-target="#deleteAllModal"
+                        title="Alle Domains löschen"
+                        aria-label="Alle Domains löschen">
+                    <i class="bi bi-trash-fill"></i> Alle löschen
+                </button>
+            {% endif %}
         </div>
     {% endif %}
 </div>
@@ -199,6 +207,32 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-send"></i> Senden
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteAllModal" tabindex="-1" aria-labelledby="deleteAllModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteAllModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Alle Domains löschen
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <form method="POST" action="{{ path('domain_delete_all') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete-all-domains') }}">
+                <div class="modal-body">
+                    <p>Möchten Sie wirklich <strong>alle Domains</strong> aus der Datenbank löschen?</p>
+                    <p class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Diese Aktion kann nicht rückgängig gemacht werden!</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash-fill"></i> Alle löschen
                     </button>
                 </div>
             </form>
