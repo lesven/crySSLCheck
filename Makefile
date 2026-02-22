@@ -60,9 +60,11 @@ console: ## Führt eine Symfony-Konsolen-Befehl aus (Übergabe: CMD="befehl")
 db-backup: ## Erstellt ein Backup der Datenbank
 	docker compose exec tls-monitor cp /var/www/html/data/tls_monitor.sqlite /var/www/html/data/tls_monitor.sqlite.backup.$(shell date +%Y%m%d_%H%M%S)
 
-install: ## Initialisiert das Projekt (Build + Up)
+install: ## Initialisiert das Projekt (Build + Up + Composer Install)
 	make build
 	make up
+	sleep 3
+	docker compose exec tls-monitor composer install
 	@echo ""
 	@echo "Container gestartet!"
 	@echo "Anwendung läuft auf: http://localhost:8443"
