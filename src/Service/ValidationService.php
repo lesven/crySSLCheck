@@ -66,4 +66,34 @@ class ValidationService
 
         return (bool) preg_match('/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/', $fqdn);
     }
+
+    /**
+     * @return string[] List of error messages
+     */
+    public function validatePasswordStrength(string $password): array
+    {
+        $errors = [];
+
+        if (strlen($password) < 12) {
+            $errors[] = 'Das Passwort muss mindestens 12 Zeichen lang sein.';
+        }
+
+        if (!preg_match('/[A-Z]/', $password)) {
+            $errors[] = 'Das Passwort muss mindestens einen Großbuchstaben enthalten.';
+        }
+
+        if (!preg_match('/[a-z]/', $password)) {
+            $errors[] = 'Das Passwort muss mindestens einen Kleinbuchstaben enthalten.';
+        }
+
+        if (!preg_match('/[0-9]/', $password)) {
+            $errors[] = 'Das Passwort muss mindestens eine Ziffer enthalten.';
+        }
+
+        if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+            $errors[] = 'Das Passwort muss mindestens ein Sonderzeichen enthalten.';
+        }
+
+        return $errors;
+    }
 }
