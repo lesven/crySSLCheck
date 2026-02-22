@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Service\ValidationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -42,6 +43,7 @@ class SecurityController extends AbstractController
         Request $request,
         UserPasswordHasherInterface $passwordHasher,
         EntityManagerInterface $entityManager,
+        ValidationService $validationService,
     ): Response {
         $user = $this->getUser();
         $errors = [];
@@ -61,7 +63,7 @@ class SecurityController extends AbstractController
                 if ($newPassword === '') {
                     $errors[] = 'Bitte ein neues Passwort eingeben.';
                 } else {
-                    $passwordErrors = $this->validatePasswordStrength($newPassword);
+                    $passwordErrors = $validationService->validatePasswordStrength($newPassword);
                     $errors = array_merge($errors, $passwordErrors);
                 }
 
@@ -82,32 +84,5 @@ class SecurityController extends AbstractController
         return $this->render('security/change_password.html.twig', [
             'errors' => $errors,
         ]);
-    }
-
-    private function validatePasswordStrength(string $password): array
-    {
-        $errors = [];
-
-        if (strlen($password) < 12) {
-            $errors[] = 'Das Passwort muss mindestens 12 Zeichen lang sein.';
-        }
-
-        if (!preg_match('/[A-Z]/', $password)) {
-            $errors[] = 'Das Passwort muss mindestens einen Großbuchstaben enthalten.';
-        }
-
-        if (!preg_match('/[a-z]/', $password)) {
-            $errors[] = 'Das Passwort muss mindestens einen Kleinbuchstaben enthalten.';
-        }
-
-        if (!preg_match('/[0-9]/', $password)) {
-            $errors[] = 'Das Passwort muss mindestens eine Ziffer enthalten.';
-        }
-
-        if (!preg_match('/[^A-Za-z0-9]/', $password)) {
-            $errors[] = 'Das Passwort muss mindestens ein Sonderzeichen enthalten.';
-        }
-
-        return $errors;
     }
 }
