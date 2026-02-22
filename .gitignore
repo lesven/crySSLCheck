@@ -26,3 +26,4 @@
 /phpunit.xml
 /.phpunit.cache/
 ###< phpunit/phpunit ###
+.phpunit.cache/test-results
