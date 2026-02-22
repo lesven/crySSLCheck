@@ -67,7 +67,7 @@ class DomainController extends AbstractController
             }
 
             try {
-                $header = fgetcsv($handle);
+                $header = fgetcsv($handle, 0, ',', '"', '');
                 if ($header === false) {
                     $this->addFlash('danger', 'CSV-Datei ist leer oder ungültig.');
                     return $this->redirectToRoute('domain_import');
@@ -87,7 +87,7 @@ class DomainController extends AbstractController
                 }
 
                 $lineNumber = 1;
-                while (($row = fgetcsv($handle)) !== false) {
+                while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
                     ++$lineNumber;
 
                     if (empty(array_filter($row, fn ($v) => $v !== null && $v !== ''))) {
@@ -160,14 +160,14 @@ class DomainController extends AbstractController
             if ($handle === false) {
                 return;
             }
-            fputcsv($handle, ['FQDN', 'Port', 'Beschreibung', 'Status']);
+            fputcsv($handle, ['FQDN', 'Port', 'Beschreibung', 'Status'], ',', '"', '');
             foreach ($domains as $domain) {
                 fputcsv($handle, [
                     $domain->getFqdn(),
                     $domain->getPort(),
                     $domain->getDescription() ?? '',
                     $domain->isActive() ? 'active' : 'inactive',
-                ]);
+                ], ',', '"', '');
             }
             fclose($handle);
         });
