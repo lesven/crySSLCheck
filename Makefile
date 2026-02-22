@@ -73,13 +73,13 @@ install: ## Initialisiert das Projekt (Build + Up + Composer Install)
 	@echo "Benutzer erstellen: make create-user USERNAME=alice PASSWORD=secret ROLE=admin"
 
 test: ## Führt alle PHPUnit Tests aus
-	docker compose exec tls-monitor php /var/www/html/bin/phpunit
+	docker compose exec -e APP_ENV=test tls-monitor php /var/www/html/bin/phpunit
 
 test-unit: ## Führt nur Unit Tests aus
-	docker compose exec tls-monitor php /var/www/html/bin/phpunit tests/Unit
+	docker compose exec -e APP_ENV=test tls-monitor php /var/www/html/bin/phpunit tests/Unit
 
 test-integration: ## Führt nur Integration Tests aus
-	docker compose exec tls-monitor php /var/www/html/bin/phpunit tests/Integration
+	docker compose exec -e APP_ENV=test tls-monitor php /var/www/html/bin/phpunit tests/Integration
 
 test-coverage: ## Führt Tests mit Code Coverage aus
-	docker compose exec tls-monitor php /var/www/html/bin/phpunit --coverage-html=var/coverage
+	docker compose exec -e APP_ENV=test tls-monitor php /var/www/html/bin/phpunit --coverage-html=var/coverage
