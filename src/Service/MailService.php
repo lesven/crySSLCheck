@@ -118,6 +118,18 @@ class MailService
         );
     }
 
+    public function sendPasswordResetMail(string $recipient, string $newPassword): bool
+    {
+        return $this->send(
+            [$recipient],
+            '[TLS Monitor] Ihr neues Passwort',
+            "Ihr Passwort für den TLS Monitor wurde zurückgesetzt.\n\n"
+            . "Neues Passwort: {$newPassword}\n\n"
+            . "Bitte melden Sie sich an und ändern Sie Ihr Passwort umgehend.\n\n"
+            . "Zeitpunkt: " . (new \DateTimeImmutable())->format('Y-m-d H:i:s') . "\n"
+        );
+    }
+
     private function send(array $recipients, string $subject, string $body): bool
     {
         $this->logger->debug('SMTP: sende E-Mail', [

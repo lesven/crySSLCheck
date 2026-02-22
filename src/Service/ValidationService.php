@@ -75,4 +75,31 @@ class ValidationService
     {
         return Password::validate($password);
     }
+
+    /**
+     * Generates a random password that satisfies the complexity rules:
+     * at least 12 characters, one uppercase, one lowercase, one digit, one special character.
+     */
+    public function generatePassword(): string
+    {
+        $uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        $lowercase = 'abcdefghjkmnpqrstuvwxyz';
+        $digits    = '23456789';
+        $special   = '!@#$%^&*()-_=+[]{}|;:,.<>?';
+
+        $password  = [];
+        $password[] = $uppercase[random_int(0, strlen($uppercase) - 1)];
+        $password[] = $lowercase[random_int(0, strlen($lowercase) - 1)];
+        $password[] = $digits[random_int(0, strlen($digits) - 1)];
+        $password[] = $special[random_int(0, strlen($special) - 1)];
+
+        $all = $uppercase . $lowercase . $digits . $special;
+        for ($i = 0; $i < 12; $i++) {
+            $password[] = $all[random_int(0, strlen($all) - 1)];
+        }
+
+        shuffle($password);
+
+        return implode('', $password);
+    }
 }
