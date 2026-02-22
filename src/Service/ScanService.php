@@ -289,12 +289,32 @@ class ScanService
             $finding->setStatus($status);
             $this->entityManager->persist($finding);
 
-            if ($status === 'new' && in_array($rawFinding['severity'], ['high', 'critical'])) {
-                $shouldNotify = !in_array($rawFinding['finding_type'], ['UNREACHABLE', 'ERROR'])
-                    || $this->notifyOnUnreachable;
+            $debugSubject = sprintf('[TLS Monitor] %s – %s für %s:%d',
+                $rawFinding['severity'],
+                $rawFinding['finding_type'],
+                $domain->getFqdn(),
+                $domain->getPort(),
+            );
 
-                if ($shouldNotify) {
-                    $this->mailService->sendFindingAlert($domain, $finding);
+            $isUnreachableType = in_array($rawFinding['finding_type'], ['UNREACHABLE', 'ERROR']);
+            $severityQualifies = in_array($rawFinding['severity'], ['high', 'critical'])
+                || ($isUnreachableType && $this->notifyOnUnreachable);
+
+            if ($status !== 'new') {
+                $this->mailService->recordSkipped($debugSubject, 'Finding bereits bekannt (status: ' . $status . ')');
+            } elseif ($isUnreachableType && !$this->notifyOnUnreachable) {
+                $this->mailService->recordSkipped($debugSubject, 'Typ ' . $rawFinding['finding_type'] . ' – Benachrichtigung deaktiviert (SCAN_NOTIFY_UNREACHABLE=false)');
+            } elseif (!$severityQualifies) {
+                $this->mailService->recordSkipped($debugSubject, 'Severity zu niedrig (' . $rawFinding['severity'] . ')');
+            } else {
+                $sent = $this->mailService->sendFindingAlert($domain, $finding);
+                if (!$sent) {
+                    $this->logger->warning('ScanService: SMTP-Alarm-Mail fehlgeschlagen', [
+                        'domain'   => $domain->getFqdn(),
+                        'port'     => $domain->getPort(),
+                        'finding'  => $rawFinding['finding_type'],
+                        'severity' => $rawFinding['severity'],
+                    ]);
                 }
             }
 
@@ -349,7 +369,12 @@ class ScanService
                 }
 
                 $sslError = openssl_error_string();
-                if ($sslError && stripos($sslError, 'certificate') !== false) {
+                $combinedErrorMsg = $errstr . ($sslError ? ' ' . $sslError : '');
+                $isCertError = stripos($combinedErrorMsg, 'certificate') !== false
+                    || stripos($combinedErrorMsg, 'ssl') !== false
+                    || stripos($combinedErrorMsg, 'self signed') !== false
+                    || stripos($combinedErrorMsg, 'unknown ca') !== false;
+                if ($isCertError) {
                     $result['chain_error'] = $errstr . ($sslError ? " ({$sslError})" : '');
 
                     $contextNoVerify = stream_context_create([

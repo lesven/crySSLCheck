@@ -43,3 +43,9 @@ services:
     App\Service\ValidationService:
         arguments:
             $allowIpAddresses: '%app.allow_ip_addresses%'
+
+    App\DataCollector\MailDataCollector:
+        arguments:
+            $requestStack: '@request_stack'
+        tags:
+            - { name: data_collector, id: mailer, template: 'mail_collector.html.twig' }

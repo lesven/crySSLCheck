@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Domain;
 use App\Repository\DomainRepository;
+use App\Service\MailService;
 use App\Service\ValidationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +21,7 @@ class DomainController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly DomainRepository $domainRepository,
         private readonly ValidationService $validationService,
+        private readonly MailService $mailService,
     ) {
     }
 
@@ -28,12 +30,17 @@ class DomainController extends AbstractController
     public function index(Request $request): Response
     {
         $session = $request->getSession();
-        $scanResults = $session->get('scan_results');
+        $scanResults  = $session->get('scan_results');
+        $mailerDebug  = $session->get('mailer_debug');
         $session->remove('scan_results');
+        $session->remove('mailer_debug');
 
         return $this->render('domain/index.html.twig', [
-            'domains'      => $this->domainRepository->findAllOrderedByFqdn(),
-            'scan_results' => $scanResults,
+            'domains'           => $this->domainRepository->findAllOrderedByFqdn(),
+            'scan_results'      => $scanResults,
+            'mailer_debug'      => $mailerDebug,
+            'mailer_configured' => $this->mailService->isConfigured(),
+            'alert_recipients'  => implode(', ', $this->mailService->getAlertRecipients()),
         ]);
     }
 

@@ -83,11 +83,11 @@ class FindingRepository extends ServiceEntityRepository
             ->where('f.domain = :domainId')
             ->andWhere('f.scanRun != :currentRunId')
             ->andWhere('f.status != :resolved')
-            ->andWhere('f.findingType NOT IN (:excludedTypes)')
+            ->andWhere('f.findingType != :ok')
             ->setParameter('domainId', $domainId)
             ->setParameter('currentRunId', $currentRunId)
             ->setParameter('resolved', 'resolved')
-            ->setParameter('excludedTypes', ['OK', 'UNREACHABLE', 'ERROR'])
+            ->setParameter('ok', 'OK')
             ->orderBy('f.checkedAt', 'DESC')
             ->getQuery()
             ->getResult();

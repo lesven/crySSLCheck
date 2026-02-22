@@ -16,12 +16,18 @@ class MailService
         private readonly string $fromEmail,
         private readonly string $fromName,
         private readonly array $alertRecipients,
+        private readonly ?\Symfony\Component\HttpFoundation\Session\SessionInterface $session = null,
     ) {
     }
 
     public function isConfigured(): bool
     {
         return !empty($this->alertRecipients) && !empty($this->fromEmail);
+    }
+
+    public function getAlertRecipients(): array
+    {
+        return $this->alertRecipients;
     }
 
     /**
@@ -79,7 +85,38 @@ class MailService
 
         $body .= "\nDetails:\n{$detailsText}\n";
 
-        return $this->send($this->alertRecipients, $subject, $body);
+        $success = $this->send($this->alertRecipients, $subject, $body);
+        if (!$success) {
+            $this->logger->warning('SMTP: Alarm-Mail konnte nicht gesendet werden', [
+                'domain' => $domain->getFqdn(),
+                'port' => $domain->getPort(),
+                'recipients' => $this->alertRecipients,
+                'subject' => $subject,
+                'config_errors' => $this->getConfigurationErrors(),
+            ]);
+        }
+
+        return $success;
+    }
+
+    /**
+     * Schreibt einen "nicht gesendet"-Eintrag in den Session-Debug-Log.
+     */
+    public function recordSkipped(string $subject, string $reason): void
+    {
+        $record = [
+            'recipients' => $this->alertRecipients,
+            'subject'    => $subject,
+            'timestamp'  => (new \DateTimeImmutable())->format('H:i:s'),
+            'success'    => false,
+            'error'      => 'nicht gesendet: ' . $reason,
+        ];
+
+        if ($this->session && $this->session->isStarted()) {
+            $existing   = $this->session->get('mailer_debug', []);
+            $existing[] = $record;
+            $this->session->set('mailer_debug', $existing);
+        }
     }
 
     public function sendTestMail(string $recipient): bool
@@ -95,6 +132,20 @@ class MailService
 
     private function send(array $recipients, string $subject, string $body): bool
     {
+        // baseline record that we'll enrich below
+        $record = [
+            'recipients' => $recipients,
+            'subject' => $subject,
+            'timestamp' => (new \DateTimeImmutable())->format('H:i:s'),
+            'success' => null,
+            'error' => null,
+        ];
+
+        $this->logger->debug('SMTP: sende E-Mail', [
+            'recipients' => $recipients,
+            'subject' => $subject,
+        ]);
+
         try {
             $email = (new Email())
                 ->from(sprintf('"%s" <%s>', $this->fromName, $this->fromEmail))
@@ -109,14 +160,38 @@ class MailService
 
             if (empty($email->getTo())) {
                 $this->logger->info('SMTP: Keine gültigen Empfänger – E-Mail wird nicht gesendet.');
+                $record['success'] = false;
+                $record['error'] = 'no valid recipients';
+                if ($this->session && $this->session->isStarted()) {
+                    $existing = $this->session->get('mailer_debug', []);
+                    $existing[] = $record;
+                    $this->session->set('mailer_debug', $existing);
+                }
                 return false;
             }
 
             $this->mailer->send($email);
             $this->logger->info('E-Mail gesendet: ' . $subject);
+            $record['success'] = true;
+            if ($this->session && $this->session->isStarted()) {
+                $existing = $this->session->get('mailer_debug', []);
+                $existing[] = $record;
+                $this->session->set('mailer_debug', $existing);
+            }
             return true;
         } catch (\Throwable $e) {
-            $this->logger->error('E-Mail-Fehler: ' . $e->getMessage());
+            $this->logger->error('E-Mail-Fehler: ' . $e->getMessage(), [
+                'recipients' => $recipients,
+                'subject' => $subject,
+                'mailer_dsn' => getenv('MAILER_DSN') ?: 'n/a',
+            ]);
+            $record['success'] = false;
+            $record['error'] = $e->getMessage();
+            if ($this->session && $this->session->isStarted()) {
+                $existing = $this->session->get('mailer_debug', []);
+                $existing[] = $record;
+                $this->session->set('mailer_debug', $existing);
+            }
             return false;
         }
     }

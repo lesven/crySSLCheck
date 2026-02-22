@@ -1,0 +1,49 @@
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
+
+{% block toolbar %}
+    {% set count = collector.attempts|length %}
+    {% if count > 0 %}
+        {% set icon %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="28" viewBox="0 0 24 28"><path fill="currentColor" d="M1 1h22v26H1z"/></svg>
+            <span class="sf-toolbar-value">{{ count }}</span>
+        {% endset %}
+        {% set text %}
+            <div class="sf-toolbar-info-piece">
+                <b>Mail attempts</b>
+            </div>
+        {% endset %}
+        {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', { link: true }) }}
+    {% endif %}
+{% endblock %}
+
+{% block panel %}
+    <h2>Mailer debug</h2>
+    {% if collector.attempts is empty %}
+        <p>No mailer activity recorded in this request.</p>
+    {% else %}
+        <table class="table table-condensed">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Time</th>
+                    <th>Recipients</th>
+                    <th>Subject</th>
+                    <th>Success</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for a in collector.attempts %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ a.timestamp }}</td>
+                    <td>{{ a.recipients|join(', ') }}</td>
+                    <td>{{ a.subject }}</td>
+                    <td>{{ a.success ? 'yes' : 'no' }}</td>
+                    <td>{{ a.error ?? '' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}

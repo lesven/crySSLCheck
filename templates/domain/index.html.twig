@@ -13,6 +13,13 @@
             <a href="{{ path('domain_import') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-upload"></i> CSV Import
             </a>
+            <button type="button"
+                    class="btn btn-outline-{{ mailer_configured ? 'success' : 'warning' }}"
+                    data-bs-toggle="modal" data-bs-target="#mailTestModal"
+                    title="Test-Mail senden">
+                <i class="bi bi-envelope"></i> Mail-Test
+                {% if not mailer_configured %}<i class="bi bi-exclamation-triangle-fill"></i>{% endif %}
+            </button>
             <a href="{{ path('domain_new') }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg"></i> Domain anlegen
             </a>
@@ -54,6 +61,30 @@
                             Läuft ab: {{ result.details.expiry_date }}
                             {% if result.details.days_remaining is defined %}({{ result.details.days_remaining }} Tage){% endif %}
                         </div>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+{% endif %}
+
+{% if mailer_debug is defined and mailer_debug is not empty %}
+    <div class="alert alert-dismissible fade show {{ mailer_debug|last.success ? 'alert-success' : 'alert-warning' }}">
+        <strong><i class="bi bi-envelope"></i> Mail-Debug:</strong>
+        <ul class="mb-0 mt-1">
+            {% for entry in mailer_debug %}
+                <li>
+                    {% if entry.success %}
+                        <span class="badge bg-success"><i class="bi bi-check-lg"></i> gesendet</span>
+                    {% else %}
+                        <span class="badge bg-danger"><i class="bi bi-x-lg"></i> fehlgeschlagen</span>
+                    {% endif %}
+                    <strong>{{ entry.subject }}</strong>
+                    &rarr; {{ entry.recipients|join(', ') }}
+                    <span class="text-muted small">({{ entry.timestamp }})</span>
+                    {% if entry.error is not empty %}
+                        <br><span class="text-danger small"><i class="bi bi-exclamation-triangle"></i> {{ entry.error }}</span>
                     {% endif %}
                 </li>
             {% endfor %}
@@ -138,6 +169,42 @@
             </tbody>
         </table>
     </div>
+{% endif %}
+
+{% if is_granted('ROLE_ADMIN') %}
+<div class="modal fade" id="mailTestModal" tabindex="-1" aria-labelledby="mailTestModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mailTestModalLabel">
+                    <i class="bi bi-envelope"></i> Test-Mail senden
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ path('smtp_test') }}">
+                <div class="modal-body">
+                    {% if not mailer_configured %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <strong>Mailer nicht vollständig konfiguriert.</strong>
+                            Bitte <code>ALERT_RECIPIENTS</code> und <code>MAILER_DSN</code> in der <code>.env</code> prüfen.
+                        </div>
+                    {% endif %}
+                    <label for="mailTestRecipient" class="form-label">Empfänger</label>
+                    <input type="email" class="form-control" id="mailTestRecipient" name="recipient"
+                           value="{{ alert_recipients }}" required placeholder="empfaenger@example.com">
+                    <div class="form-text text-muted">Vorbefüllt aus <code>ALERT_RECIPIENTS</code>.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i> Senden
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endif %}
 {% endblock %}
 
