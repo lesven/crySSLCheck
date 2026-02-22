@@ -21,4 +21,9 @@
 .idea/
 .vscode/
 *.swp
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
 .phpunit.cache/test-results

@@ -1,0 +1,31 @@
+<?php
+
+namespace App\Tests\Integration;
+
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\SchemaTool;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+
+abstract class IntegrationTestCase extends KernelTestCase
+{
+    protected EntityManagerInterface $em;
+
+    protected function setUp(): void
+    {
+        self::bootKernel();
+        $this->em = self::getContainer()->get(EntityManagerInterface::class);
+
+        $schemaTool = new SchemaTool($this->em);
+        $metadata   = $this->em->getMetadataFactory()->getAllMetadata();
+        $schemaTool->dropSchema($metadata);
+        $schemaTool->createSchema($metadata);
+    }
+
+    protected function tearDown(): void
+    {
+        $schemaTool = new SchemaTool($this->em);
+        $schemaTool->dropSchema($this->em->getMetadataFactory()->getAllMetadata());
+
+        parent::tearDown();
+    }
+}

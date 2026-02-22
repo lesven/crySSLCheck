@@ -13,7 +13,7 @@ class MailDataCollector extends DataCollector
     {
     }
 
-    public function collect(Request $request, Response $response, \Throwable $exception = null): void
+    public function collect(Request $request, Response $response, ?\Throwable $exception = null): void
     {
         // pull any stored mail attempts out of the session; clear afterwards
         $session = $this->requestStack->getSession();
