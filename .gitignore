@@ -21,3 +21,4 @@
 .idea/
 .vscode/
 *.swp
+.phpunit.cache/test-results
