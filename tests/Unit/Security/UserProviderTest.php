@@ -27,8 +27,8 @@ class UserProviderTest extends TestCase
     {
         $user = $this->createUser('alice', 'alice@example.com');
 
-        $this->userRepository->method('findByUsername')->with('alice')->willReturn($user);
-        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->userRepository->expects($this->once())->method('findByUsername')->with('alice')->willReturn($user);
+        $this->userRepository->expects($this->never())->method('findByEmail');
 
         $result = $this->provider->loadUserByIdentifier('alice');
         $this->assertSame($user, $result);
@@ -38,7 +38,8 @@ class UserProviderTest extends TestCase
     {
         $user = $this->createUser('alice', 'alice@example.com');
 
-        $this->userRepository->method('findByEmail')->with('alice@example.com')->willReturn($user);
+        $this->userRepository->expects($this->once())->method('findByEmail')->with('alice@example.com')->willReturn($user);
+        $this->userRepository->expects($this->never())->method('findByUsername');
 
         $result = $this->provider->loadUserByIdentifier('alice@example.com');
         $this->assertSame($user, $result);
@@ -49,8 +50,8 @@ class UserProviderTest extends TestCase
         $user = $this->createUser('alice', 'alice@example.com');
 
         // 'alice' is not a valid email, so username is tried first, then email
-        $this->userRepository->method('findByUsername')->willReturn(null);
-        $this->userRepository->method('findByEmail')->with('alice')->willReturn($user);
+        $this->userRepository->expects($this->once())->method('findByUsername')->with('alice')->willReturn(null);
+        $this->userRepository->expects($this->once())->method('findByEmail')->with('alice')->willReturn($user);
 
         $result = $this->provider->loadUserByIdentifier('alice');
         $this->assertSame($user, $result);
@@ -61,8 +62,8 @@ class UserProviderTest extends TestCase
         $user = $this->createUser('alice@example.com', 'other@example.com');
 
         // 'alice@example.com' is a valid email, so email is tried first, then username
-        $this->userRepository->method('findByEmail')->with('alice@example.com')->willReturn(null);
-        $this->userRepository->method('findByUsername')->with('alice@example.com')->willReturn($user);
+        $this->userRepository->expects($this->once())->method('findByEmail')->with('alice@example.com')->willReturn(null);
+        $this->userRepository->expects($this->once())->method('findByUsername')->with('alice@example.com')->willReturn($user);
 
         $result = $this->provider->loadUserByIdentifier('alice@example.com');
         $this->assertSame($user, $result);
@@ -70,8 +71,8 @@ class UserProviderTest extends TestCase
 
     public function testLoadUserByIdentifierThrowsWhenNotFound(): void
     {
-        $this->userRepository->method('findByUsername')->willReturn(null);
-        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->userRepository->expects($this->once())->method('findByUsername')->with('unknown')->willReturn(null);
+        $this->userRepository->expects($this->once())->method('findByEmail')->with('unknown')->willReturn(null);
 
         $this->expectException(UserNotFoundException::class);
         $this->provider->loadUserByIdentifier('unknown');
@@ -81,7 +82,8 @@ class UserProviderTest extends TestCase
     {
         $user = $this->createUser('alice', 'alice@example.com');
 
-        $this->userRepository->method('findByUsername')->with('alice')->willReturn($user);
+        $this->userRepository->expects($this->once())->method('findByUsername')->with('alice')->willReturn($user);
+        $this->userRepository->expects($this->never())->method('findByEmail');
 
         $result = $this->provider->refreshUser($user);
         $this->assertSame($user, $result);
@@ -89,14 +91,14 @@ class UserProviderTest extends TestCase
 
     public function testSupportsClassForUserEntity(): void
     {
-        $this->userRepository->method('getClassName')->willReturn(User::class);
+        $this->userRepository->expects($this->atLeastOnce())->method('getClassName')->willReturn(User::class);
 
         $this->assertTrue($this->provider->supportsClass(User::class));
     }
 
     public function testDoesNotSupportUnrelatedClass(): void
     {
-        $this->userRepository->method('getClassName')->willReturn(User::class);
+        $this->userRepository->expects($this->atLeastOnce())->method('getClassName')->willReturn(User::class);
 
         $this->assertFalse($this->provider->supportsClass(\stdClass::class));
     }
