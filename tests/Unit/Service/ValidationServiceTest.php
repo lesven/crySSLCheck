@@ -270,4 +270,28 @@ class ValidationServiceTest extends TestCase
         $errors = $this->service->validatePasswordStrength('abc');
         $this->assertGreaterThan(1, count($errors));
     }
+
+    // ── generatePassword ─────────────────────────────────────────────────────
+
+    public function testGeneratedPasswordPassesStrengthValidation(): void
+    {
+        $password = $this->service->generatePassword();
+        $errors = $this->service->validatePasswordStrength($password);
+        $this->assertEmpty($errors, 'Generated password must satisfy all complexity rules. Errors: ' . implode(', ', $errors));
+    }
+
+    public function testGeneratedPasswordHasAtLeast12Characters(): void
+    {
+        $password = $this->service->generatePassword();
+        $this->assertGreaterThanOrEqual(12, strlen($password));
+    }
+
+    public function testGeneratedPasswordsAreUnique(): void
+    {
+        $passwords = [];
+        for ($i = 0; $i < 10; $i++) {
+            $passwords[] = $this->service->generatePassword();
+        }
+        $this->assertCount(10, array_unique($passwords), 'Generated passwords should be unique');
+    }
 }
