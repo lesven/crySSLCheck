@@ -13,6 +13,13 @@ use Psr\Log\LoggerInterface;
 
 class ScanService
 {
+    private const OPENSSL_KEY_TYPES = [
+        OPENSSL_KEYTYPE_RSA => 'RSA',
+        OPENSSL_KEYTYPE_DSA => 'DSA',
+        OPENSSL_KEYTYPE_DH  => 'DH',
+        OPENSSL_KEYTYPE_EC  => 'EC',
+    ];
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly DomainRepository $domainRepository,
@@ -117,7 +124,6 @@ class ScanService
     {
         $fqdn = $domain->getFqdn();
         $port = $domain->getPort();
-        $findings = [];
 
         $result = $this->performTlsCheck($fqdn, $port);
 
@@ -148,120 +154,136 @@ class ScanService
             ]];
         }
 
-        // Certificate expiry check
-        $daysRemaining = null;
-        if (isset($result['valid_to'])) {
-            $expiryDate = new \DateTimeImmutable($result['valid_to']);
-            $now = new \DateTimeImmutable();
-            $daysRemaining = (int) $now->diff($expiryDate)->format('%r%a');
+        $daysRemaining = $this->computeDaysRemaining($result);
 
-            if ($daysRemaining < 0) {
-                $findings[] = [
-                    'finding_type' => 'CERT_EXPIRY',
-                    'severity'     => 'critical',
-                    'details'      => [
-                        'expiry_date'    => $result['valid_to'],
-                        'days_remaining' => $daysRemaining,
-                        'subject'        => $result['subject'] ?? '',
-                        'issuer'         => $result['issuer'] ?? '',
-                    ],
-                ];
-            } elseif ($daysRemaining <= 7) {
-                $findings[] = [
-                    'finding_type' => 'CERT_EXPIRY',
-                    'severity'     => 'high',
-                    'details'      => [
-                        'expiry_date'    => $result['valid_to'],
-                        'days_remaining' => $daysRemaining,
-                        'subject'        => $result['subject'] ?? '',
-                        'issuer'         => $result['issuer'] ?? '',
-                    ],
-                ];
-            } elseif ($daysRemaining <= 14) {
-                $findings[] = [
-                    'finding_type' => 'CERT_EXPIRY',
-                    'severity'     => 'medium',
-                    'details'      => [
-                        'expiry_date'    => $result['valid_to'],
-                        'days_remaining' => $daysRemaining,
-                        'subject'        => $result['subject'] ?? '',
-                        'issuer'         => $result['issuer'] ?? '',
-                    ],
-                ];
-            } elseif ($daysRemaining <= 30) {
-                $findings[] = [
-                    'finding_type' => 'CERT_EXPIRY',
-                    'severity'     => 'low',
-                    'details'      => [
-                        'expiry_date'    => $result['valid_to'],
-                        'days_remaining' => $daysRemaining,
-                        'subject'        => $result['subject'] ?? '',
-                        'issuer'         => $result['issuer'] ?? '',
-                    ],
-                ];
-            }
-        }
-
-        // TLS version check
-        if (isset($result['protocol'])) {
-            $insecureProtocols = ['TLSv1', 'TLSv1.0', 'TLSv1.1', 'SSLv3', 'SSLv2'];
-            if (in_array($result['protocol'], $insecureProtocols)) {
-                $findings[] = [
-                    'finding_type' => 'TLS_VERSION',
-                    'severity'     => 'high',
-                    'details'      => [
-                        'protocol' => $result['protocol'],
-                        'message'  => "Unsichere TLS-Version: {$result['protocol']}",
-                    ],
-                ];
-            }
-        }
-
-        // Certificate chain check
-        if (!empty($result['chain_error'])) {
-            $findings[] = [
-                'finding_type' => 'CHAIN_ERROR',
-                'severity'     => 'high',
-                'details'      => ['error' => $result['chain_error']],
-            ];
-        }
-
-        // RSA key length check
-        if (isset($result['public_key_type']) && strtoupper($result['public_key_type']) === 'RSA' && isset($result['public_key_bits'])) {
-            $bits = (int) $result['public_key_bits'];
-            if ($bits < $this->minRsaKeyBits) {
-                $findings[] = [
-                    'finding_type' => 'RSA_KEY_LENGTH',
-                    'severity'     => ($bits < 1024 ? 'critical' : 'high'),
-                    'details'      => [
-                        'key_bits' => $bits,
-                        'message'  => "RSA-Schlüssellänge zu kurz: {$bits} bits (empfohlen >= {$this->minRsaKeyBits})",
-                    ],
-                ];
-            }
-        }
+        $findings = array_values(array_filter([
+            $this->checkCertExpiry($result, $daysRemaining),
+            $this->checkTlsVersion($result),
+            $this->checkChainError($result),
+            $this->checkRsaKeyLength($result),
+        ]));
 
         if (empty($findings)) {
-            $findings[] = [
-                'finding_type' => 'OK',
-                'severity'     => 'ok',
-                'details'      => [
-                    'protocol'        => $result['protocol'] ?? 'unknown',
-                    'cipher_name'     => $result['cipher_name'] ?? 'unknown',
-                    'cipher_bits'     => $result['cipher_bits'] ?? null,
-                    'cipher_version'  => $result['cipher_version'] ?? null,
-                    'valid_to'        => $result['valid_to'] ?? 'unknown',
-                    'valid_from'      => $result['valid_from'] ?? 'unknown',
-                    'days_remaining'  => $daysRemaining,
-                    'subject'         => $result['subject'] ?? '',
-                    'issuer'          => $result['issuer'] ?? '',
-                    'public_key_type' => $result['public_key_type'] ?? null,
-                    'public_key_bits' => $result['public_key_bits'] ?? null,
-                ],
-            ];
+            $findings[] = $this->buildOkFinding($result, $daysRemaining);
         }
 
         return $findings;
+    }
+
+    private function computeDaysRemaining(array $result): ?int
+    {
+        if (!isset($result['valid_to'])) {
+            return null;
+        }
+
+        $expiryDate = new \DateTimeImmutable($result['valid_to']);
+        $now = new \DateTimeImmutable();
+
+        return (int) $now->diff($expiryDate)->format('%r%a');
+    }
+
+    private function checkCertExpiry(array $result, ?int $daysRemaining): ?array
+    {
+        if ($daysRemaining === null) {
+            return null;
+        }
+
+        $severity = match (true) {
+            $daysRemaining < 0  => 'critical',
+            $daysRemaining <= 7  => 'high',
+            $daysRemaining <= 14 => 'medium',
+            $daysRemaining <= 30 => 'low',
+            default              => null,
+        };
+
+        if ($severity === null) {
+            return null;
+        }
+
+        return [
+            'finding_type' => 'CERT_EXPIRY',
+            'severity'     => $severity,
+            'details'      => [
+                'expiry_date'    => $result['valid_to'],
+                'days_remaining' => $daysRemaining,
+                'subject'        => $result['subject'] ?? '',
+                'issuer'         => $result['issuer'] ?? '',
+            ],
+        ];
+    }
+
+    private function checkTlsVersion(array $result): ?array
+    {
+        $insecureProtocols = ['TLSv1', 'TLSv1.0', 'TLSv1.1', 'SSLv3', 'SSLv2'];
+
+        if (!isset($result['protocol']) || !in_array($result['protocol'], $insecureProtocols)) {
+            return null;
+        }
+
+        return [
+            'finding_type' => 'TLS_VERSION',
+            'severity'     => 'high',
+            'details'      => [
+                'protocol' => $result['protocol'],
+                'message'  => "Unsichere TLS-Version: {$result['protocol']}",
+            ],
+        ];
+    }
+
+    private function checkChainError(array $result): ?array
+    {
+        if (empty($result['chain_error'])) {
+            return null;
+        }
+
+        return [
+            'finding_type' => 'CHAIN_ERROR',
+            'severity'     => 'high',
+            'details'      => ['error' => $result['chain_error']],
+        ];
+    }
+
+    private function checkRsaKeyLength(array $result): ?array
+    {
+        if (!isset($result['public_key_type']) || strtoupper($result['public_key_type']) !== 'RSA' || !isset($result['public_key_bits'])) {
+            return null;
+        }
+
+        $bits = (int) $result['public_key_bits'];
+
+        if ($bits >= $this->minRsaKeyBits) {
+            return null;
+        }
+
+        return [
+            'finding_type' => 'RSA_KEY_LENGTH',
+            'severity'     => ($bits < 1024 ? 'critical' : 'high'),
+            'details'      => [
+                'key_bits' => $bits,
+                'message'  => "RSA-Schlüssellänge zu kurz: {$bits} bits (empfohlen >= {$this->minRsaKeyBits})",
+            ],
+        ];
+    }
+
+    private function buildOkFinding(array $result, ?int $daysRemaining): array
+    {
+        return [
+            'finding_type' => 'OK',
+            'severity'     => 'ok',
+            'details'      => [
+                'protocol'        => $result['protocol'] ?? 'unknown',
+                'cipher_name'     => $result['cipher_name'] ?? 'unknown',
+                'cipher_bits'     => $result['cipher_bits'] ?? null,
+                'cipher_version'  => $result['cipher_version'] ?? null,
+                'valid_to'        => $result['valid_to'] ?? 'unknown',
+                'valid_from'      => $result['valid_from'] ?? 'unknown',
+                'days_remaining'  => $daysRemaining,
+                'subject'         => $result['subject'] ?? '',
+                'issuer'          => $result['issuer'] ?? '',
+                'public_key_type' => $result['public_key_type'] ?? null,
+                'public_key_bits' => $result['public_key_bits'] ?? null,
+            ],
+        ];
     }
 
     /**
@@ -399,35 +421,11 @@ class ScanService
                         $params = stream_context_get_params($streamRetry);
                         if (isset($params['options']['ssl']['peer_certificate'])) {
                             $certPem = $params['options']['ssl']['peer_certificate'];
-                            $certInfo = openssl_x509_parse($certPem);
-                            if ($certInfo) {
-                                $result['valid_to'] = date('Y-m-d H:i:s', $certInfo['validTo_time_t']);
-                                $result['valid_from'] = date('Y-m-d H:i:s', $certInfo['validFrom_time_t']);
-                                $result['subject'] = $certInfo['subject']['CN'] ?? '';
-                                $result['issuer'] = $certInfo['issuer']['CN'] ?? '';
-                            }
-
-                            $pubKey = @openssl_pkey_get_public($certPem);
-                            if ($pubKey !== false) {
-                                $keyDetails = openssl_pkey_get_details($pubKey);
-                                if ($keyDetails && isset($keyDetails['bits'])) {
-                                    $result['public_key_bits'] = $keyDetails['bits'];
-                                    $types = [
-                                        OPENSSL_KEYTYPE_RSA => 'RSA',
-                                        OPENSSL_KEYTYPE_DSA => 'DSA',
-                                        OPENSSL_KEYTYPE_DH  => 'DH',
-                                        OPENSSL_KEYTYPE_EC  => 'EC',
-                                    ];
-                                    $result['public_key_type'] = $types[$keyDetails['type']] ?? 'UNKNOWN';
-                                }
-                            }
+                            $result = array_merge($result, $this->extractCertificateInfo($certPem));
+                            $result = array_merge($result, $this->extractPublicKeyInfo($certPem));
                         }
 
-                        $meta = stream_get_meta_data($streamRetry);
-                        $result['protocol'] = $meta['crypto']['protocol'] ?? 'unknown';
-                        $result['cipher_name'] = $meta['crypto']['cipher_name'] ?? 'unknown';
-                        $result['cipher_bits'] = $meta['crypto']['cipher_bits'] ?? null;
-                        $result['cipher_version'] = $meta['crypto']['cipher_version'] ?? null;
+                        $result = array_merge($result, $this->extractStreamMetadata($streamRetry));
                         fclose($streamRetry);
                     }
 
@@ -439,47 +437,12 @@ class ScanService
             }
 
             $params = stream_context_get_params($stream);
-            $meta = stream_get_meta_data($stream);
-
-            $result['protocol'] = $meta['crypto']['protocol'] ?? 'unknown';
-            $result['cipher_name'] = $meta['crypto']['cipher_name'] ?? 'unknown';
-            $result['cipher_bits'] = $meta['crypto']['cipher_bits'] ?? null;
-            $result['cipher_version'] = $meta['crypto']['cipher_version'] ?? null;
+            $result = array_merge($result, $this->extractStreamMetadata($stream));
 
             if (isset($params['options']['ssl']['peer_certificate'])) {
                 $certPem = $params['options']['ssl']['peer_certificate'];
-                $certInfo = openssl_x509_parse($certPem);
-                if ($certInfo) {
-                    $result['valid_to'] = date('Y-m-d H:i:s', $certInfo['validTo_time_t']);
-                    $result['valid_from'] = date('Y-m-d H:i:s', $certInfo['validFrom_time_t']);
-                    $result['subject'] = $certInfo['subject']['CN'] ?? '';
-                    $result['issuer'] = $certInfo['issuer']['CN'] ?? '';
-                    $result['serial'] = $certInfo['serialNumberHex'] ?? '';
-                }
-
-                $pubKey = false;
-                if (is_resource($certPem) || is_object($certPem)) {
-                    $pem = '';
-                    if (openssl_x509_export($certPem, $pem)) {
-                        $pubKey = @openssl_pkey_get_public($pem);
-                    }
-                } else {
-                    $pubKey = @openssl_pkey_get_public($certPem);
-                }
-
-                if ($pubKey !== false) {
-                    $keyDetails = openssl_pkey_get_details($pubKey);
-                    if ($keyDetails && isset($keyDetails['bits'])) {
-                        $result['public_key_bits'] = $keyDetails['bits'];
-                        $types = [
-                            OPENSSL_KEYTYPE_RSA => 'RSA',
-                            OPENSSL_KEYTYPE_DSA => 'DSA',
-                            OPENSSL_KEYTYPE_DH  => 'DH',
-                            OPENSSL_KEYTYPE_EC  => 'EC',
-                        ];
-                        $result['public_key_type'] = $types[$keyDetails['type']] ?? 'UNKNOWN';
-                    }
-                }
+                $result = array_merge($result, $this->extractCertificateInfo($certPem, true));
+                $result = array_merge($result, $this->extractPublicKeyInfo($certPem));
             }
 
             fclose($stream);
@@ -493,5 +456,61 @@ class ScanService
             }
             return ['error' => $e->getMessage()];
         }
+    }
+
+    private function extractCertificateInfo(mixed $certPem, bool $withSerial = false): array
+    {
+        $info = [];
+        $certInfo = openssl_x509_parse($certPem);
+
+        if ($certInfo) {
+            $info['valid_to']   = date('Y-m-d H:i:s', $certInfo['validTo_time_t']);
+            $info['valid_from'] = date('Y-m-d H:i:s', $certInfo['validFrom_time_t']);
+            $info['subject']    = $certInfo['subject']['CN'] ?? '';
+            $info['issuer']     = $certInfo['issuer']['CN'] ?? '';
+
+            if ($withSerial) {
+                $info['serial'] = $certInfo['serialNumberHex'] ?? '';
+            }
+        }
+
+        return $info;
+    }
+
+    private function extractPublicKeyInfo(mixed $certPem): array
+    {
+        $info = [];
+        $pubKey = false;
+
+        if (is_resource($certPem) || is_object($certPem)) {
+            $pem = '';
+            if (openssl_x509_export($certPem, $pem)) {
+                $pubKey = @openssl_pkey_get_public($pem);
+            }
+        } else {
+            $pubKey = @openssl_pkey_get_public($certPem);
+        }
+
+        if ($pubKey !== false) {
+            $keyDetails = openssl_pkey_get_details($pubKey);
+            if ($keyDetails && isset($keyDetails['bits'])) {
+                $info['public_key_bits'] = $keyDetails['bits'];
+                $info['public_key_type'] = self::OPENSSL_KEY_TYPES[$keyDetails['type']] ?? 'UNKNOWN';
+            }
+        }
+
+        return $info;
+    }
+
+    private function extractStreamMetadata(mixed $stream): array
+    {
+        $meta = stream_get_meta_data($stream);
+
+        return [
+            'protocol'       => $meta['crypto']['protocol'] ?? 'unknown',
+            'cipher_name'    => $meta['crypto']['cipher_name'] ?? 'unknown',
+            'cipher_bits'    => $meta['crypto']['cipher_bits'] ?? null,
+            'cipher_version' => $meta['crypto']['cipher_version'] ?? null,
+        ];
     }
 }
