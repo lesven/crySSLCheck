@@ -296,4 +296,19 @@ class DomainController extends AbstractController
         $this->addFlash('success', 'Domain erfolgreich gelöscht.');
         return $this->redirectToRoute('domain_index');
     }
+
+    #[Route('/delete-all', name: 'domain_delete_all', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function deleteAll(Request $request): Response
+    {
+        if (!$this->isCsrfTokenValid('delete-all-domains', $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Ungültiges CSRF-Token.');
+            return $this->redirectToRoute('domain_index');
+        }
+
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Domain d')->execute();
+
+        $this->addFlash('success', 'Alle Domains wurden erfolgreich gelöscht.');
+        return $this->redirectToRoute('domain_index');
+    }
 }

@@ -104,19 +104,7 @@ class MailService
      */
     public function recordSkipped(string $subject, string $reason): void
     {
-        $record = [
-            'recipients' => $this->alertRecipients,
-            'subject'    => $subject,
-            'timestamp'  => (new \DateTimeImmutable())->format('H:i:s'),
-            'success'    => false,
-            'error'      => 'nicht gesendet: ' . $reason,
-        ];
-
-        if ($this->session && $this->session->isStarted()) {
-            $existing   = $this->session->get('mailer_debug', []);
-            $existing[] = $record;
-            $this->session->set('mailer_debug', $existing);
-        }
+        $this->logToSession($this->alertRecipients, $subject, false, 'nicht gesendet: ' . $reason);
     }
 
     public function sendTestMail(string $recipient): bool
@@ -132,52 +120,23 @@ class MailService
 
     private function send(array $recipients, string $subject, string $body): bool
     {
-        // baseline record that we'll enrich below
-        $record = [
-            'recipients' => $recipients,
-            'subject' => $subject,
-            'timestamp' => (new \DateTimeImmutable())->format('H:i:s'),
-            'success' => null,
-            'error' => null,
-        ];
-
         $this->logger->debug('SMTP: sende E-Mail', [
             'recipients' => $recipients,
             'subject' => $subject,
         ]);
 
         try {
-            $email = (new Email())
-                ->from(sprintf('"%s" <%s>', $this->fromName, $this->fromEmail))
-                ->subject($subject)
-                ->text($body);
-
-            foreach ($recipients as $recipient) {
-                if (!empty(trim($recipient))) {
-                    $email->addTo(trim($recipient));
-                }
-            }
+            $email = $this->buildEmail($recipients, $subject, $body);
 
             if (empty($email->getTo())) {
                 $this->logger->info('SMTP: Keine gültigen Empfänger – E-Mail wird nicht gesendet.');
-                $record['success'] = false;
-                $record['error'] = 'no valid recipients';
-                if ($this->session && $this->session->isStarted()) {
-                    $existing = $this->session->get('mailer_debug', []);
-                    $existing[] = $record;
-                    $this->session->set('mailer_debug', $existing);
-                }
+                $this->logToSession($recipients, $subject, false, 'no valid recipients');
                 return false;
             }
 
             $this->mailer->send($email);
             $this->logger->info('E-Mail gesendet: ' . $subject);
-            $record['success'] = true;
-            if ($this->session && $this->session->isStarted()) {
-                $existing = $this->session->get('mailer_debug', []);
-                $existing[] = $record;
-                $this->session->set('mailer_debug', $existing);
-            }
+            $this->logToSession($recipients, $subject, true);
             return true;
         } catch (\Throwable $e) {
             $this->logger->error('E-Mail-Fehler: ' . $e->getMessage(), [
@@ -185,14 +144,51 @@ class MailService
                 'subject' => $subject,
                 'mailer_dsn' => getenv('MAILER_DSN') ?: 'n/a',
             ]);
-            $record['success'] = false;
-            $record['error'] = $e->getMessage();
-            if ($this->session && $this->session->isStarted()) {
-                $existing = $this->session->get('mailer_debug', []);
-                $existing[] = $record;
-                $this->session->set('mailer_debug', $existing);
-            }
+            $this->logToSession($recipients, $subject, false, $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Builds an Email object from the given recipients, subject, and body.
+     * Only non-empty trimmed recipients are added as To-addresses.
+     */
+    private function buildEmail(array $recipients, string $subject, string $body): Email
+    {
+        $email = (new Email())
+            ->from(sprintf('"%s" <%s>', $this->fromName, $this->fromEmail))
+            ->subject($subject)
+            ->text($body);
+
+        foreach ($recipients as $recipient) {
+            if (!empty(trim($recipient))) {
+                $email->addTo(trim($recipient));
+            }
+        }
+
+        return $email;
+    }
+
+    /**
+     * Appends a debug record for this send attempt to the session mailer_debug log.
+     * Does nothing when no session is available or not yet started.
+     */
+    private function logToSession(array $recipients, string $subject, bool $success, ?string $error = null): void
+    {
+        if (!$this->session || !$this->session->isStarted()) {
+            return;
+        }
+
+        $record = [
+            'recipients' => $recipients,
+            'subject'    => $subject,
+            'timestamp'  => (new \DateTimeImmutable())->format('H:i:s'),
+            'success'    => $success,
+            'error'      => $error,
+        ];
+
+        $existing   = $this->session->get('mailer_debug', []);
+        $existing[] = $record;
+        $this->session->set('mailer_debug', $existing);
     }
 }
