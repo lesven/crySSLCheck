@@ -33,12 +33,13 @@ class CreateUserCommand extends Command
         $this
             ->addArgument('username', InputArgument::REQUIRED, 'Benutzername')
             ->addArgument('password', InputArgument::REQUIRED, 'Passwort')
+            ->addArgument('email', InputArgument::REQUIRED, 'E-Mail-Adresse')
             ->addOption('role', 'r', InputOption::VALUE_OPTIONAL, 'Rolle (admin oder auditor)', 'auditor')
             ->setHelp(<<<'HELP'
 Der <info>app:create-user</info>-Befehl erstellt einen neuen Benutzer:
 
-    <info>php bin/console app:create-user alice secret123 --role=admin</info>
-    <info>php bin/console app:create-user bob password123</info>  (Standard-Rolle: auditor)
+    <info>php bin/console app:create-user alice secret123 alice@example.com --role=admin</info>
+    <info>php bin/console app:create-user bob password123 bob@example.com</info>  (Standard-Rolle: auditor)
 
 HELP);
     }
@@ -49,10 +50,16 @@ HELP);
 
         $username = $input->getArgument('username');
         $password = $input->getArgument('password');
+        $email    = $input->getArgument('email');
         $role = $input->getOption('role');
 
         if (!in_array($role, ['admin', 'auditor'])) {
             $io->error("Ungültige Rolle '{$role}'. Erlaubt: admin, auditor");
+            return Command::FAILURE;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $io->error("Ungültige E-Mail-Adresse '{$email}'.");
             return Command::FAILURE;
         }
 
@@ -64,12 +71,13 @@ HELP);
         $user = new User();
         $user->setUsername($username);
         $user->setRole($role);
+        $user->setEmail($email);
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
 
-        $io->success("Benutzer '{$username}' mit Rolle '{$role}' wurde erfolgreich erstellt.");
+        $io->success("Benutzer '{$username}' mit Rolle '{$role}' und E-Mail '{$email}' wurde erfolgreich erstellt.");
 
         return Command::SUCCESS;
     }

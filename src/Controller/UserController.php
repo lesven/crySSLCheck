@@ -39,6 +39,7 @@ class UserController extends AbstractController
         $errors = [];
         $username = '';
         $role = 'auditor';
+        $email = '';
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('user_new', $request->request->get('_token'))) {
@@ -47,6 +48,7 @@ class UserController extends AbstractController
                 $username = trim($request->request->get('username', ''));
                 $password = $request->request->get('password', '');
                 $role     = $request->request->get('role', 'auditor');
+                $email    = trim($request->request->get('email', ''));
 
                 if ($username === '') {
                     $errors[] = 'Benutzername darf nicht leer sein.';
@@ -58,6 +60,11 @@ class UserController extends AbstractController
                     $errors[] = 'Ungültige Rolle.';
                 }
 
+                $emailError = $this->validateEmail($email);
+                if ($emailError !== null) {
+                    $errors[] = $emailError;
+                }
+
                 $passwordErrors = $this->validationService->validatePasswordStrength($password);
                 $errors = array_merge($errors, $passwordErrors);
 
@@ -65,6 +72,7 @@ class UserController extends AbstractController
                     $user = new User();
                     $user->setUsername($username);
                     $user->setRole($role);
+                    $user->setEmail($email);
                     $user->setPassword($this->passwordHasher->hashPassword($user, $password));
                     $this->entityManager->persist($user);
                     $this->entityManager->flush();
@@ -79,6 +87,7 @@ class UserController extends AbstractController
             'errors'   => $errors,
             'username' => $username,
             'role'     => $role,
+            'email'    => $email,
         ]);
     }
 
@@ -93,6 +102,7 @@ class UserController extends AbstractController
         $errors = [];
         $username = $user->getUsername();
         $role = $user->getRole();
+        $email = $user->getEmail();
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('user_edit_' . $id, $request->request->get('_token'))) {
@@ -101,6 +111,7 @@ class UserController extends AbstractController
                 $username = trim($request->request->get('username', ''));
                 $password = $request->request->get('password', '');
                 $role     = $request->request->get('role', 'auditor');
+                $email    = trim($request->request->get('email', ''));
 
                 if ($username === '') {
                     $errors[] = 'Benutzername darf nicht leer sein.';
@@ -119,6 +130,11 @@ class UserController extends AbstractController
                     $errors[] = 'Der letzte Administrator kann nicht herabgestuft werden.';
                 }
 
+                $emailError = $this->validateEmail($email);
+                if ($emailError !== null) {
+                    $errors[] = $emailError;
+                }
+
                 if ($password !== '') {
                     $passwordErrors = $this->validationService->validatePasswordStrength($password);
                     $errors = array_merge($errors, $passwordErrors);
@@ -127,6 +143,7 @@ class UserController extends AbstractController
                 if (empty($errors)) {
                     $user->setUsername($username);
                     $user->setRole($role);
+                    $user->setEmail($email);
                     if ($password !== '') {
                         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
                     }
@@ -143,6 +160,7 @@ class UserController extends AbstractController
             'errors'   => $errors,
             'username' => $username,
             'role'     => $role,
+            'email'    => $email,
         ]);
     }
 
@@ -176,5 +194,14 @@ class UserController extends AbstractController
 
         $this->addFlash('success', sprintf('Benutzer „%s" erfolgreich gelöscht.', $user->getUsername()));
         return $this->redirectToRoute('user_index');
+    }
+
+    private function validateEmail(string $email): ?string
+    {
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return 'Bitte eine gültige E-Mail-Adresse angeben.';
+        }
+
+        return null;
     }
 }
