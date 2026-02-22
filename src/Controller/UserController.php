@@ -82,6 +82,70 @@ class UserController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}/edit', name: 'user_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    public function edit(int $id, Request $request): Response
+    {
+        $user = $this->userRepository->find($id);
+        if (!$user) {
+            throw $this->createNotFoundException('Benutzer nicht gefunden.');
+        }
+
+        $errors = [];
+        $username = $user->getUsername();
+        $role = $user->getRole();
+
+        if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('user_edit_' . $id, $request->request->get('_token'))) {
+                $errors[] = 'Ungültiges CSRF-Token.';
+            } else {
+                $username = trim($request->request->get('username', ''));
+                $password = $request->request->get('password', '');
+                $role     = $request->request->get('role', 'auditor');
+
+                if ($username === '') {
+                    $errors[] = 'Benutzername darf nicht leer sein.';
+                } elseif ($username !== $user->getUsername()) {
+                    $existing = $this->userRepository->findByUsername($username);
+                    if ($existing !== null) {
+                        $errors[] = 'Dieser Benutzername ist bereits vergeben.';
+                    }
+                }
+
+                if (!in_array($role, ['admin', 'auditor'], true)) {
+                    $errors[] = 'Ungültige Rolle.';
+                }
+
+                if ($user->isAdmin() && $role !== 'admin' && $this->userRepository->countAdmins() <= 1) {
+                    $errors[] = 'Der letzte Administrator kann nicht herabgestuft werden.';
+                }
+
+                if ($password !== '') {
+                    $passwordErrors = $this->validationService->validatePasswordStrength($password);
+                    $errors = array_merge($errors, $passwordErrors);
+                }
+
+                if (empty($errors)) {
+                    $user->setUsername($username);
+                    $user->setRole($role);
+                    if ($password !== '') {
+                        $user->setPassword($this->passwordHasher->hashPassword($user, $password));
+                    }
+                    $this->entityManager->flush();
+
+                    $this->addFlash('success', sprintf('Benutzer „%s" erfolgreich gespeichert.', $username));
+                    return $this->redirectToRoute('user_index');
+                }
+            }
+        }
+
+        return $this->render('user/edit.html.twig', [
+            'user'     => $user,
+            'errors'   => $errors,
+            'username' => $username,
+            'role'     => $role,
+        ]);
+    }
+
     #[Route('/{id}/delete', name: 'user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function delete(int $id, Request $request): Response
     {

@@ -34,6 +34,10 @@
                             </span>
                         </td>
                         <td>
+                            <a href="{{ path('user_edit', {id: user.id}) }}"
+                               class="btn btn-sm btn-outline-secondary me-1" title="Bearbeiten">
+                                <i class="bi bi-pencil"></i>
+                            </a>
                             <form method="POST"
                                   action="{{ path('user_delete', {id: user.id}) }}"
                                   class="d-inline user-delete-form"
