@@ -63,6 +63,8 @@ class UserController extends AbstractController
                 $emailError = $this->validateEmail($email);
                 if ($emailError !== null) {
                     $errors[] = $emailError;
+                } elseif ($this->userRepository->findByEmail($email) !== null) {
+                    $errors[] = 'Diese E-Mail-Adresse ist bereits vergeben.';
                 }
 
                 $passwordErrors = $this->validationService->validatePasswordStrength($password);
@@ -133,6 +135,8 @@ class UserController extends AbstractController
                 $emailError = $this->validateEmail($email);
                 if ($emailError !== null) {
                     $errors[] = $emailError;
+                } elseif ($this->userRepository->findByEmail($email, $user->getId()) !== null) {
+                    $errors[] = 'Diese E-Mail-Adresse ist bereits vergeben.';
                 }
 
                 if ($password !== '') {
