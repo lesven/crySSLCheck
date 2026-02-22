@@ -20,6 +20,7 @@
             <thead class="table-dark">
                 <tr>
                     <th>Benutzername</th>
+                    <th>E-Mail</th>
                     <th>Rolle</th>
                     <th>Aktionen</th>
                 </tr>
@@ -28,6 +29,7 @@
                 {% for user in users %}
                     <tr>
                         <td>{{ user.username }}</td>
+                        <td>{{ user.email }}</td>
                         <td>
                             <span class="badge bg-{{ user.role == 'admin' ? 'primary' : 'secondary' }}">
                                 {{ user.role }}

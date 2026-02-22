@@ -25,6 +25,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 20, options: ['default' => 'auditor'])]
     private string $role = 'auditor';
 
+    #[ORM\Column(length: 255, options: ['default' => 'example@example.com'])]
+    private string $email = 'example@example.com';
+
     public function getId(): ?int
     {
         return $this->id;
@@ -87,5 +90,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function eraseCredentials(): void
     {
         // No plain-text password stored
+    }
+
+    public function getEmail(): string
+    {
+        return $this->email;
+    }
+
+    public function setEmail(string $email): static
+    {
+        $this->email = $email;
+
+        return $this;
     }
 }
