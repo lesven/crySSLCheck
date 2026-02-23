@@ -34,6 +34,11 @@ clean: ## Stoppt Container und löscht Volumes
 clean-all: ## Löscht Container, Volumes und Images
 	docker compose down -v --rmi all
 
+purge: ## Löscht ALLES: Container, Volumes, Images und Host-seitige Build-Artefakte (vendor/, var/cache/)
+	docker compose down -v --rmi all --remove-orphans || true
+	rm -rf vendor/ var/cache/
+	@echo "Alles bereinigt. Weiter mit: make install"
+
 rebuild: ## Führt clean, build und up aus
 	make down
 	make build
@@ -64,7 +69,7 @@ install: ## Initialisiert das Projekt (Build + Up + Composer Install + Migration
 	make build
 	make up
 	sleep 3
-	docker compose exec tls-monitor composer install
+	docker compose exec -e COMPOSER_MEMORY_LIMIT=-1 tls-monitor composer install --no-interaction
 	docker compose exec tls-monitor php /var/www/html/bin/console doctrine:migrations:migrate --no-interaction
 	@echo ""
 	@echo "Container gestartet!"
