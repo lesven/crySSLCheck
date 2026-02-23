@@ -95,7 +95,17 @@ class ScanService
             }
 
             if (!empty($activeProcesses)) {
-                usleep(50_000);
+                // Warten Sie kurz auf einen der aktiven Prozesse, anstatt einen festen usleep() aufzurufen.
+                $firstEntry = reset($activeProcesses);
+                if ($firstEntry !== false) {
+                    /** @var Process $process */
+                    $process = $firstEntry['process'];
+                    $start = microtime(true);
+                    $process->waitUntil(static function (Process $p) use ($start): bool {
+                        // Maximal 50ms warten oder früher abbrechen, wenn der Prozess beendet ist.
+                        return $p->isTerminated() || (microtime(true) - $start) >= 0.05;
+                    });
+                }
             }
         }
 
