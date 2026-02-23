@@ -62,10 +62,28 @@ class ScanService
         while (!empty($domainQueue) || !empty($activeProcesses)) {
             while (count($activeProcesses) < $effectiveConcurrency && !empty($domainQueue)) {
                 $domain = array_shift($domainQueue);
-                if (!$domain instanceof Domain || $domain->getId() === null || $scanRun->getId() === null) {
+
+                if (!$domain instanceof Domain) {
+                    $this->logger->warning('Skipping scan for non-Domain value returned from DomainRepository::findActive().', [
+                        'value_type' => get_debug_type($domain),
+                    ]);
                     continue;
                 }
 
+                if ($domain->getId() === null) {
+                    $this->logger->warning('Skipping scan for Domain without ID returned from DomainRepository::findActive().', [
+                        'fqdn' => $domain->getFqdn(),
+                        'port' => $domain->getPort(),
+                    ]);
+                    continue;
+                }
+
+                if ($scanRun->getId() === null) {
+                    $this->logger->warning('Skipping scan because ScanRun ID is null after persist/flush.', [
+                        'scan_run' => $scanRun,
+                    ]);
+                    continue;
+                }
                 $process = $this->createScanDomainProcess($domain->getId(), $scanRun->getId());
                 $process->start();
                 $activeProcesses[] = [
