@@ -143,13 +143,18 @@ class ScanService
 
     protected function createScanDomainProcess(int $domainId, int $scanRunId): Process
     {
-        return new Process([
-            PHP_BINARY,
-            'bin/console',
-            'app:scan-domain',
-            (string) $domainId,
-            (string) $scanRunId,
-        ]);
+        $projectRoot = \dirname(__DIR__, 2);
+
+        return new Process(
+            [
+                PHP_BINARY,
+                $projectRoot . '/bin/console',
+                'app:scan-domain',
+                (string) $domainId,
+                (string) $scanRunId,
+            ],
+            $projectRoot
+        );
     }
 
     public function runSingleScan(Domain $domain): array
