@@ -12,6 +12,7 @@ use App\Service\ScanService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
 use Symfony\Component\Process\Process;
 
@@ -100,6 +101,53 @@ class ScanServiceConcurrencyTest extends TestCase
         $this->assertSame('partial', $scanRun->getStatus());
         $this->assertLessThanOrEqual(2, $maxRunning);
         $this->assertSame([1, 2, 3, 4], $service->startedDomainIds);
+    }
+
+    public function testRunFullScanReturnsFailedWhenAllDomainsSkippedDueToNullId(): void
+    {
+        $domainRepository = $this->createMock(DomainRepository::class);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+
+        // Domains without IDs simulate the null-ID guard in the domain processing loop
+        $domainWithoutId = new Domain();
+        $domainWithoutId->setFqdn('no-id.example');
+        $domainWithoutId->setPort(443);
+
+        $domainRepository->method('findActive')->willReturn([$domainWithoutId]);
+
+        $entityManager->method('persist')->willReturnCallback(function (object $entity): void {
+            if ($entity instanceof ScanRun) {
+                $ref = new \ReflectionProperty(ScanRun::class, 'id');
+                $ref->setValue($entity, 99);
+            }
+        });
+        $entityManager->method('flush')->willReturn(null);
+
+        $warnings = [];
+        $warningLogger = new class($warnings) extends AbstractLogger {
+            public function __construct(private array &$warnings) {}
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                if ($level === 'warning') {
+                    $this->warnings[] = (string) $message;
+                }
+            }
+        };
+
+        $service = new ScanService(
+            $entityManager,
+            $domainRepository,
+            $this->createStub(FindingRepository::class),
+            $this->createStub(ScanRunRepository::class),
+            $this->createStub(MailService::class),
+            $warningLogger,
+        );
+
+        $scanRun = $service->runFullScan();
+
+        $this->assertSame('failed', $scanRun->getStatus());
+        $this->assertNotEmpty($warnings, 'Expected at least one warning to be logged');
     }
 
     private function createDomainWithId(int $id, string $fqdn): Domain

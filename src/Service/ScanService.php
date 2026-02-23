@@ -58,11 +58,16 @@ class ScanService
         $domainQueue = array_values($domains);
         $activeProcesses = [];
         $exitCodes = [];
+        $skippedCount = 0;
 
         while (!empty($domainQueue) || !empty($activeProcesses)) {
             while (count($activeProcesses) < $effectiveConcurrency && !empty($domainQueue)) {
                 $domain = array_shift($domainQueue);
                 if (!$domain instanceof Domain || $domain->getId() === null || $scanRun->getId() === null) {
+                    $skippedCount++;
+                    $this->logger->warning('Domain übersprungen wegen ungültiger ID.', [
+                        'domain' => $domain instanceof Domain ? $domain->getFqdn() : 'unknown',
+                    ]);
                     continue;
                 }
 
@@ -102,7 +107,12 @@ class ScanService
         $allFailed = !empty($exitCodes) && count(array_filter($exitCodes, static fn (int $code): bool => $code >= 2)) === count($exitCodes);
         $hasErrors = count(array_filter($exitCodes, static fn (int $code): bool => $code >= 1)) > 0;
 
-        $status = $allFailed ? 'failed' : ($hasErrors ? 'partial' : 'success');
+        if ($skippedCount > 0 && empty($exitCodes)) {
+            $this->logger->warning("Alle {$skippedCount} Domains wurden wegen ungültiger IDs übersprungen. Kein Scan durchgeführt.");
+        }
+
+        $allSkipped = empty($exitCodes) && $skippedCount > 0;
+        $status = ($allFailed || $allSkipped) ? 'failed' : ($hasErrors ? 'partial' : 'success');
         $scanRun->finish($status);
         $this->entityManager->flush();
 
