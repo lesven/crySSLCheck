@@ -47,7 +47,14 @@ class ScanDomainCommand extends Command
             }
 
             return $this->scanService->scanAndPersistDomain($domain, $scanRun);
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            $output->writeln(sprintf(
+                '<error>Unexpected error while executing scan for domain-id "%s" and scan-run-id "%s": [%s] %s</error>',
+                (string) $input->getArgument('domain-id'),
+                (string) $input->getArgument('scan-run-id'),
+                get_class($exception),
+                $exception->getMessage()
+            ));
             return 2;
         }
     }
