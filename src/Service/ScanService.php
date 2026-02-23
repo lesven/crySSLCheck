@@ -88,7 +88,25 @@ class ScanService
                 $exitCodes[] = $exitCode;
 
                 if ($exitCode >= 2) {
-                    $this->logger->error("Subprozess fehlgeschlagen für {$domain->getFqdn()}:{$domain->getPort()} mit Exit-Code {$exitCode}");
+                    $errorOutput = trim($process->getErrorOutput());
+                    $standardOutput = trim($process->getOutput());
+
+                    $message = "Subprozess fehlgeschlagen für {$domain->getFqdn()}:{$domain->getPort()} mit Exit-Code {$exitCode}";
+
+                    if ($errorOutput !== '' || $standardOutput !== '') {
+                        $message .= ' | ';
+                        if ($errorOutput !== '') {
+                            $message .= 'STDERR: ' . $errorOutput;
+                        }
+                        if ($standardOutput !== '') {
+                            if ($errorOutput !== '') {
+                                $message .= ' | ';
+                            }
+                            $message .= 'STDOUT: ' . $standardOutput;
+                        }
+                    }
+
+                    $this->logger->error($message);
                 }
 
                 unset($activeProcesses[$index]);
