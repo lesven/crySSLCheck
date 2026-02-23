@@ -33,6 +33,7 @@ class ScanServiceAnalysisTest extends TestCase
             scanTimeout: 5,
             retryDelay: 0,
             retryCount: 0,
+            concurrency: 3,
             notifyOnUnreachable: false,
             minRsaKeyBits: 2048,
         );

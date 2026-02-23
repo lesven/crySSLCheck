@@ -10,6 +10,7 @@ use App\Repository\FindingRepository;
 use App\Repository\ScanRunRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Process\Process;
 
 class ScanService
 {
@@ -30,12 +31,13 @@ class ScanService
         private readonly int $scanTimeout = 10,
         private readonly int $retryDelay = 5,
         private readonly int $retryCount = 1,
+        private readonly int $concurrency = 3,
         private readonly bool $notifyOnUnreachable = false,
         private readonly int $minRsaKeyBits = 2048,
     ) {
     }
 
-    public function runFullScan(): ScanRun
+    public function runFullScan(bool $force = false, ?int $concurrencyOverride = null): ScanRun
     {
         $domains = $this->domainRepository->findActive();
 
@@ -50,37 +52,55 @@ class ScanService
             return $scanRun;
         }
 
-        $this->logger->info("Scan-Run #{$scanRun->getId()} gestartet mit " . count($domains) . " Domains.");
+        $effectiveConcurrency = max(1, $concurrencyOverride ?? $this->concurrency);
+        $this->logger->info("Scan-Run #{$scanRun->getId()} gestartet mit " . count($domains) . " Domains und Concurrency {$effectiveConcurrency}.");
 
-        $hasErrors = false;
-        $allFailed = true;
+        $domainQueue = array_values($domains);
+        $activeProcesses = [];
+        $exitCodes = [];
 
-        foreach ($domains as $domain) {
-            try {
-                $scanFindings = $this->scanDomain($domain);
-                $this->persistFindings($domain, $scanRun, $scanFindings);
-
-                $allFailed = false;
-                foreach ($scanFindings as $f) {
-                    if (in_array($f['finding_type'], ['UNREACHABLE', 'ERROR'])) {
-                        $hasErrors = true;
-                    }
+        while (!empty($domainQueue) || !empty($activeProcesses)) {
+            while (count($activeProcesses) < $effectiveConcurrency && !empty($domainQueue)) {
+                $domain = array_shift($domainQueue);
+                if (!$domain instanceof Domain || $domain->getId() === null || $scanRun->getId() === null) {
+                    continue;
                 }
-            } catch (\Throwable $e) {
-                $this->logger->error("Fehler beim Scannen von {$domain->getFqdn()}:{$domain->getPort()}: " . $e->getMessage());
-                $hasErrors = true;
 
-                $finding = new Finding();
-                $finding->setDomain($domain);
-                $finding->setScanRun($scanRun);
-                $finding->setFindingType('ERROR');
-                $finding->setSeverity('low');
-                $finding->setDetails(['error' => $e->getMessage()]);
-                $finding->setStatus('new');
-                $this->entityManager->persist($finding);
-                $this->entityManager->flush();
+                $process = $this->createScanDomainProcess($domain->getId(), $scanRun->getId());
+                $process->start();
+                $activeProcesses[] = [
+                    'domain' => $domain,
+                    'process' => $process,
+                ];
+            }
+
+            foreach ($activeProcesses as $index => $entry) {
+                /** @var Process $process */
+                $process = $entry['process'];
+                /** @var Domain $domain */
+                $domain = $entry['domain'];
+
+                if (!$process->isTerminated()) {
+                    continue;
+                }
+
+                $exitCode = $process->getExitCode() ?? 2;
+                $exitCodes[] = $exitCode;
+
+                if ($exitCode >= 2) {
+                    $this->logger->error("Subprozess fehlgeschlagen für {$domain->getFqdn()}:{$domain->getPort()} mit Exit-Code {$exitCode}");
+                }
+
+                unset($activeProcesses[$index]);
+            }
+
+            if (!empty($activeProcesses)) {
+                usleep(50_000);
             }
         }
+
+        $allFailed = !empty($exitCodes) && count(array_filter($exitCodes, static fn (int $code): bool => $code >= 2)) === count($exitCodes);
+        $hasErrors = count(array_filter($exitCodes, static fn (int $code): bool => $code >= 1)) > 0;
 
         $status = $allFailed ? 'failed' : ($hasErrors ? 'partial' : 'success');
         $scanRun->finish($status);
@@ -89,6 +109,47 @@ class ScanService
         $this->logger->info("Scan-Run #{$scanRun->getId()} beendet mit Status: {$status}");
 
         return $scanRun;
+    }
+
+    public function scanAndPersistDomain(Domain $domain, ScanRun $scanRun): int
+    {
+        try {
+            $scanFindings = $this->scanDomain($domain);
+            $this->persistFindings($domain, $scanRun, $scanFindings);
+
+            foreach ($scanFindings as $finding) {
+                if (in_array($finding['finding_type'], ['UNREACHABLE', 'ERROR'], true)) {
+                    return 1;
+                }
+            }
+
+            return 0;
+        } catch (\Throwable $e) {
+            $this->logger->error("Fehler beim Scannen von {$domain->getFqdn()}:{$domain->getPort()}: " . $e->getMessage());
+
+            $finding = new Finding();
+            $finding->setDomain($domain);
+            $finding->setScanRun($scanRun);
+            $finding->setFindingType('ERROR');
+            $finding->setSeverity('low');
+            $finding->setDetails(['error' => $e->getMessage()]);
+            $finding->setStatus('new');
+            $this->entityManager->persist($finding);
+            $this->entityManager->flush();
+
+            return 2;
+        }
+    }
+
+    protected function createScanDomainProcess(int $domainId, int $scanRunId): Process
+    {
+        return new Process([
+            PHP_BINARY,
+            'bin/console',
+            'app:scan-domain',
+            (string) $domainId,
+            (string) $scanRunId,
+        ]);
     }
 
     public function runSingleScan(Domain $domain): array

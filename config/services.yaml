@@ -5,6 +5,7 @@ parameters:
     app.scan_timeout: '%env(int:SCAN_TIMEOUT)%'
     app.retry_delay: '%env(int:RETRY_DELAY)%'
     app.retry_count: '%env(int:RETRY_COUNT)%'
+    app.scan_concurrency: '%env(int:SCAN_CONCURRENCY)%'
     app.notify_on_unreachable: '%env(bool:NOTIFY_ON_UNREACHABLE)%'
     app.min_rsa_key_bits: '%env(int:MIN_RSA_KEY_BITS)%'
     app.allow_ip_addresses: '%env(bool:ALLOW_IP_ADDRESSES)%'
@@ -29,6 +30,7 @@ services:
             $scanTimeout: '%app.scan_timeout%'
             $retryDelay: '%app.retry_delay%'
             $retryCount: '%app.retry_count%'
+            $concurrency: '%app.scan_concurrency%'
             $notifyOnUnreachable: '%app.notify_on_unreachable%'
             $minRsaKeyBits: '%app.min_rsa_key_bits%'
 
@@ -49,3 +51,7 @@ services:
             $requestStack: '@request_stack'
         tags:
             - { name: data_collector, id: mailer, template: 'mail_collector.html.twig' }
+
+    App\EventSubscriber\SqliteWalSubscriber:
+        tags:
+            - { name: doctrine.event_subscriber }

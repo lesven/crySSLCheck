@@ -33,6 +33,13 @@ class ScanCommand extends Command
             'f',
             InputOption::VALUE_NONE,
             'Erzwingt Scan auch wenn bereits ein erfolgreicher Scan heute existiert'
+        )
+        ->addOption(
+            'concurrency',
+            'c',
+            InputOption::VALUE_OPTIONAL,
+            'Überschreibt SCAN_CONCURRENCY für diesen Lauf',
+            null
         );
     }
 
@@ -40,6 +47,8 @@ class ScanCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $force = $input->getOption('force');
+        $concurrencyOption = $input->getOption('concurrency');
+        $concurrency = $concurrencyOption !== null ? max(1, (int) $concurrencyOption) : null;
 
         if (!$force) {
             $todayRun = $this->scanRunRepository->findLatestSuccessfulToday();
@@ -56,7 +65,7 @@ class ScanCommand extends Command
         $io->text('Zeitpunkt: ' . (new \DateTimeImmutable())->format('Y-m-d H:i:s'));
 
         try {
-            $scanRun = $this->scanService->runFullScan();
+            $scanRun = $this->scanService->runFullScan($force, $concurrency);
 
             if ($scanRun->getFinishedAt() === null) {
                 $io->warning('Keine aktiven Domains vorhanden.');

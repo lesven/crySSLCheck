@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs shell clean ps scan create-user test test-unit test-integration test-coverage
+.PHONY: help build up down restart logs shell clean ps scan scan-parallel create-user test test-unit test-integration test-coverage
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Befehle:"
@@ -49,6 +49,9 @@ scan: ## Führt einen manuellen Scan aus
 
 scan-force: ## Führt einen manuellen Scan aus (erzwingt Scan auch wenn heute bereits erfolgreich)
 	docker compose exec tls-monitor php /var/www/html/bin/console app:scan --force
+
+scan-parallel: ## Optionaler Alias für parallelen Scan (Concurrency via SCAN_CONCURRENCY oder --concurrency)
+	docker compose exec tls-monitor php /var/www/html/bin/console app:scan
 
 create-user: ## Erstellt einen neuen Benutzer (Übergabe: USERNAME=user PASSWORD=pass [ROLE=admin|auditor])
 	@if [ -n "$(USERNAME)" ] && [ -n "$(PASSWORD)" ]; then \
