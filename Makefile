@@ -66,6 +66,7 @@ db-backup: ## Erstellt ein Backup der Datenbank
 	docker compose exec tls-monitor cp /var/www/html/data/tls_monitor.sqlite /var/www/html/data/tls_monitor.sqlite.backup.$(shell date +%Y%m%d_%H%M%S)
 
 deploy:
+	git pull
 	make down
 	make install
 
