@@ -142,7 +142,7 @@ class Finding
             Severity::HIGH     => 'warning',
             Severity::MEDIUM   => 'info',
             Severity::LOW      => 'secondary',
-            default            => 'success',
+            Severity::OK       => 'success',
         };
     }
 
@@ -152,7 +152,6 @@ class Finding
             FindingStatus::NEW      => 'danger',
             FindingStatus::KNOWN    => 'warning',
             FindingStatus::RESOLVED => 'success',
-            default                 => 'secondary',
         };
     }
 }

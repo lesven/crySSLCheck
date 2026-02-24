@@ -291,7 +291,7 @@ class ScanService
 
     /**
      * @param array<array{finding_type: FindingType, severity: Severity, details: array}> $scanFindings
-     * @return array<array{finding_type: string, severity: string, details: array, status: string}>
+     * @return array<array{finding_type: string, severity: string, details: array, status: string}> String-backed values for session/template use
      */
     private function persistFindings(Domain $domain, ScanRun $scanRun, array $scanFindings): array
     {
