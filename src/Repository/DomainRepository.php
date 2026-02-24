@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Domain;
+use App\Enum\DomainStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -35,7 +36,7 @@ class DomainRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('d')
             ->where('d.status = :status')
-            ->setParameter('status', 'active')
+            ->setParameter('status', DomainStatus::ACTIVE->value)
             ->orderBy('d.fqdn', 'ASC')
             ->addOrderBy('d.port', 'ASC')
             ->getQuery()

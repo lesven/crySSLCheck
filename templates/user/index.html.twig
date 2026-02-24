@@ -31,8 +31,8 @@
                         <td>{{ user.username }}</td>
                         <td>{{ user.email }}</td>
                         <td>
-                            <span class="badge bg-{{ user.role == 'admin' ? 'primary' : 'secondary' }}">
-                                {{ user.role }}
+                            <span class="badge bg-{{ user.role.value == 'admin' ? 'primary' : 'secondary' }}">
+                                {{ user.role.value }}
                             </span>
                         </td>
                         <td>

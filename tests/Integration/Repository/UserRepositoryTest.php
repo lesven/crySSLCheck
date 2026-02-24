@@ -3,6 +3,7 @@
 namespace App\Tests\Integration\Repository;
 
 use App\Entity\User;
+use App\Enum\UserRole;
 use App\Repository\UserRepository;
 use App\Tests\Integration\IntegrationTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -23,7 +24,7 @@ class UserRepositoryTest extends IntegrationTestCase
         $user = new User();
         $user->setUsername($username);
         $user->setEmail($email);
-        $user->setRole($role);
+        $user->setRole(UserRole::from($role));
         $user->setPassword('hashed_password');
         $this->em->persist($user);
 

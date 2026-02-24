@@ -4,6 +4,7 @@ namespace App\Tests\Integration\Command;
 
 use App\Command\CreateUserCommand;
 use App\Entity\User;
+use App\Enum\UserRole;
 use App\Repository\UserRepository;
 use App\Tests\Integration\IntegrationTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -45,7 +46,7 @@ class CreateUserCommandTest extends IntegrationTestCase
         $this->assertNotNull($user);
         $this->assertSame('testuser', $user->getUsername());
         $this->assertSame('test@example.com', $user->getEmail());
-        $this->assertSame('auditor', $user->getRole());
+        $this->assertSame(UserRole::AUDITOR, $user->getRole());
     }
 
     public function testCreateUserWithAdminRole(): void
@@ -62,7 +63,7 @@ class CreateUserCommandTest extends IntegrationTestCase
 
         $user = $this->userRepository->findByUsername('adminuser');
         $this->assertNotNull($user);
-        $this->assertSame('admin', $user->getRole());
+        $this->assertSame(UserRole::ADMIN, $user->getRole());
         $this->assertTrue($user->isAdmin());
     }
 
@@ -173,6 +174,6 @@ class CreateUserCommandTest extends IntegrationTestCase
 
         $user = $this->userRepository->findByUsername('testuser');
         $this->assertNotNull($user);
-        $this->assertSame('admin', $user->getRole());
+        $this->assertSame(UserRole::ADMIN, $user->getRole());
     }
 }

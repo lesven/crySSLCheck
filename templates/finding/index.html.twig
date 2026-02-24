@@ -56,9 +56,9 @@
                     <tr>
                         <td>{{ finding.domain.fqdn }}</td>
                         <td>{{ finding.domain.port }}</td>
-                        <td>{{ finding.findingType }}</td>
+                        <td>{{ finding.findingType.value }}</td>
                         <td>
-                            {% if finding.findingType == 'OK' and details %}
+                            {% if finding.findingType.value == 'OK' and details %}
                                 <small>
                                     {% if details.protocol is defined %}<strong>TLS:</strong> {{ details.protocol }}<br>{% endif %}
                                     {% if details.cipher_name is defined %}
@@ -73,14 +73,14 @@
                                         {% if details.days_remaining is defined %}({{ details.days_remaining }}d){% endif %}
                                     {% endif %}
                                 </small>
-                            {% elseif finding.findingType == 'CERT_EXPIRY' and details.expiry_date is defined %}
+                            {% elseif finding.findingType.value == 'CERT_EXPIRY' and details.expiry_date is defined %}
                                 <small>
                                     <strong>Läuft ab:</strong> {{ details.expiry_date }}
                                     {% if details.days_remaining is defined %}({{ details.days_remaining }} Tage){% endif %}
                                 </small>
-                            {% elseif finding.findingType == 'TLS_VERSION' and details.protocol is defined %}
+                            {% elseif finding.findingType.value == 'TLS_VERSION' and details.protocol is defined %}
                                 <small>Unsicher: {{ details.protocol }}</small>
-                            {% elseif finding.findingType == 'RSA_KEY_LENGTH' and details.key_bits is defined %}
+                            {% elseif finding.findingType.value == 'RSA_KEY_LENGTH' and details.key_bits is defined %}
                                 <small>
                                     <strong>RSA-Schlüssellänge:</strong> {{ details.key_bits }} bits
                                     {% if details.message is defined %} — {{ details.message }}{% endif %}
@@ -92,11 +92,11 @@
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge bg-{{ finding.severityBadgeClass }}">{{ finding.severity }}</span>
+                            <span class="badge bg-{{ finding.severityBadgeClass }}">{{ finding.severity.value }}</span>
                         </td>
                         <td>{{ finding.checkedAt ? finding.checkedAt|date('Y-m-d H:i') : '' }}</td>
                         <td>
-                            <span class="badge bg-{{ finding.statusBadgeClass }}">{{ finding.status }}</span>
+                            <span class="badge bg-{{ finding.statusBadgeClass }}">{{ finding.status.value }}</span>
                         </td>
                     </tr>
                 {% endfor %}

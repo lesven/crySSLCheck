@@ -3,6 +3,7 @@
 namespace App\Tests\Integration\Repository;
 
 use App\Entity\Domain;
+use App\Enum\DomainStatus;
 use App\Repository\DomainRepository;
 use App\Tests\Integration\IntegrationTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -18,7 +19,7 @@ class DomainRepositoryTest extends IntegrationTestCase
         $this->repository = self::getContainer()->get(DomainRepository::class);
     }
 
-    private function createDomain(string $fqdn, int $port = 443, string $status = 'active'): Domain
+    private function createDomain(string $fqdn, int $port = 443, DomainStatus $status = DomainStatus::ACTIVE): Domain
     {
         $domain = new Domain();
         $domain->setFqdn($fqdn);
@@ -68,8 +69,8 @@ class DomainRepositoryTest extends IntegrationTestCase
 
     public function testFindAllOrderedByFqdnIncludesBothActiveAndInactiveDomains(): void
     {
-        $this->createDomain('active.example.com', 443, 'active');
-        $this->createDomain('inactive.example.com', 443, 'inactive');
+        $this->createDomain('active.example.com', 443, DomainStatus::ACTIVE);
+        $this->createDomain('inactive.example.com', 443, DomainStatus::INACTIVE);
         $this->em->flush();
 
         $result = $this->repository->findAllOrderedByFqdn();
@@ -86,8 +87,8 @@ class DomainRepositoryTest extends IntegrationTestCase
 
     public function testFindActiveReturnsOnlyActiveDomains(): void
     {
-        $this->createDomain('active.example.com', 443, 'active');
-        $this->createDomain('inactive.example.com', 443, 'inactive');
+        $this->createDomain('active.example.com', 443, DomainStatus::ACTIVE);
+        $this->createDomain('inactive.example.com', 443, DomainStatus::INACTIVE);
         $this->em->flush();
 
         $result = $this->repository->findActive();
@@ -98,8 +99,8 @@ class DomainRepositoryTest extends IntegrationTestCase
 
     public function testFindActiveReturnsEmptyArrayWhenAllDomainsAreInactive(): void
     {
-        $this->createDomain('server1.example.com', 443, 'inactive');
-        $this->createDomain('server2.example.com', 443, 'inactive');
+        $this->createDomain('server1.example.com', 443, DomainStatus::INACTIVE);
+        $this->createDomain('server2.example.com', 443, DomainStatus::INACTIVE);
         $this->em->flush();
 
         $result = $this->repository->findActive();
@@ -108,8 +109,8 @@ class DomainRepositoryTest extends IntegrationTestCase
 
     public function testFindActiveReturnsDomainsSortedByFqdn(): void
     {
-        $this->createDomain('z.example.com', 443, 'active');
-        $this->createDomain('a.example.com', 443, 'active');
+        $this->createDomain('z.example.com', 443, DomainStatus::ACTIVE);
+        $this->createDomain('a.example.com', 443, DomainStatus::ACTIVE);
         $this->em->flush();
 
         $result = $this->repository->findActive();

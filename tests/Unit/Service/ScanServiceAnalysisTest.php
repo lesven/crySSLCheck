@@ -3,6 +3,10 @@
 namespace App\Tests\Unit\Service;
 
 use App\Entity\Domain;
+use App\Enum\DomainStatus;
+use App\Enum\FindingStatus;
+use App\Enum\FindingType;
+use App\Enum\Severity;
 use App\Repository\DomainRepository;
 use App\Repository\FindingRepository;
 use App\Repository\ScanRunRepository;
@@ -79,7 +83,7 @@ class ScanServiceAnalysisTest extends TestCase
     }
 
     #[DataProvider('certExpiryProvider')]
-    public function testCheckCertExpiryMapsToCorrectSeverity(int $daysRemaining, ?string $expectedSeverity): void
+    public function testCheckCertExpiryMapsToCorrectSeverity(int $daysRemaining, ?Severity $expectedSeverity): void
     {
         $certData = [
             'valid_to' => '2030-01-01 00:00:00',
@@ -93,7 +97,7 @@ class ScanServiceAnalysisTest extends TestCase
             $this->assertNull($result, "Expected null for $daysRemaining days remaining");
         } else {
             $this->assertNotNull($result);
-            $this->assertSame('CERT_EXPIRY', $result['finding_type']);
+            $this->assertSame(FindingType::CERT_EXPIRY, $result['finding_type']);
             $this->assertSame($expectedSeverity, $result['severity']);
             $this->assertSame($daysRemaining, $result['details']['days_remaining']);
         }
@@ -102,15 +106,15 @@ class ScanServiceAnalysisTest extends TestCase
     public static function certExpiryProvider(): array
     {
         return [
-            'already expired (-1 day) → critical'    => [-1, 'critical'],
-            'expires today (0 days) → high'          => [0, 'high'],
-            'expired 5 days ago → critical'           => [-5, 'critical'],
-            'expires in 1 day → high'                => [1, 'high'],
-            'expires in 7 days → high'               => [7, 'high'],
-            'expires in 8 days → medium'             => [8, 'medium'],
-            'expires in 14 days → medium'            => [14, 'medium'],
-            'expires in 15 days → low'               => [15, 'low'],
-            'expires in 30 days → low'               => [30, 'low'],
+            'already expired (-1 day) → critical'    => [-1, Severity::CRITICAL],
+            'expires today (0 days) → high'          => [0, Severity::HIGH],
+            'expired 5 days ago → critical'           => [-5, Severity::CRITICAL],
+            'expires in 1 day → high'                => [1, Severity::HIGH],
+            'expires in 7 days → high'               => [7, Severity::HIGH],
+            'expires in 8 days → medium'             => [8, Severity::MEDIUM],
+            'expires in 14 days → medium'            => [14, Severity::MEDIUM],
+            'expires in 15 days → low'               => [15, Severity::LOW],
+            'expires in 30 days → low'               => [30, Severity::LOW],
             'expires in 31 days → no finding (null)' => [31, null],
             'expires in 90 days → no finding (null)' => [90, null],
         ];
@@ -138,8 +142,8 @@ class ScanServiceAnalysisTest extends TestCase
         $result = $this->callPrivate('checkTlsVersion', ['protocol' => $protocol]);
 
         $this->assertNotNull($result);
-        $this->assertSame('TLS_VERSION', $result['finding_type']);
-        $this->assertSame('high', $result['severity']);
+        $this->assertSame(FindingType::TLS_VERSION, $result['finding_type']);
+        $this->assertSame(Severity::HIGH, $result['severity']);
         $this->assertSame($protocol, $result['details']['protocol']);
     }
 
@@ -194,8 +198,8 @@ class ScanServiceAnalysisTest extends TestCase
         $result = $this->callPrivate('checkChainError', ['chain_error' => 'self signed certificate']);
 
         $this->assertNotNull($result);
-        $this->assertSame('CHAIN_ERROR', $result['finding_type']);
-        $this->assertSame('high', $result['severity']);
+        $this->assertSame(FindingType::CHAIN_ERROR, $result['finding_type']);
+        $this->assertSame(Severity::HIGH, $result['severity']);
         $this->assertSame('self signed certificate', $result['details']['error']);
     }
 
@@ -242,8 +246,8 @@ class ScanServiceAnalysisTest extends TestCase
         ]);
 
         $this->assertNotNull($result);
-        $this->assertSame('RSA_KEY_LENGTH', $result['finding_type']);
-        $this->assertSame('high', $result['severity']);
+        $this->assertSame(FindingType::RSA_KEY_LENGTH, $result['finding_type']);
+        $this->assertSame(Severity::HIGH, $result['severity']);
         $this->assertSame(1024, $result['details']['key_bits']);
     }
 
@@ -255,8 +259,8 @@ class ScanServiceAnalysisTest extends TestCase
         ]);
 
         $this->assertNotNull($result);
-        $this->assertSame('RSA_KEY_LENGTH', $result['finding_type']);
-        $this->assertSame('critical', $result['severity']);
+        $this->assertSame(FindingType::RSA_KEY_LENGTH, $result['finding_type']);
+        $this->assertSame(Severity::CRITICAL, $result['severity']);
     }
 
     public function testCheckRsaKeyLengthIsCaseInsensitiveForKeyType(): void
@@ -267,7 +271,7 @@ class ScanServiceAnalysisTest extends TestCase
         ]);
 
         $this->assertNotNull($resultLower);
-        $this->assertSame('RSA_KEY_LENGTH', $resultLower['finding_type']);
+        $this->assertSame(FindingType::RSA_KEY_LENGTH, $resultLower['finding_type']);
     }
 
     // ── buildOkFinding ───────────────────────────────────────────────────────
@@ -289,8 +293,8 @@ class ScanServiceAnalysisTest extends TestCase
 
         $result = $this->callPrivate('buildOkFinding', $certData, 365);
 
-        $this->assertSame('OK', $result['finding_type']);
-        $this->assertSame('ok', $result['severity']);
+        $this->assertSame(FindingType::OK, $result['finding_type']);
+        $this->assertSame(Severity::OK, $result['severity']);
         $this->assertSame('TLSv1.3', $result['details']['protocol']);
         $this->assertSame(365, $result['details']['days_remaining']);
     }
@@ -299,7 +303,7 @@ class ScanServiceAnalysisTest extends TestCase
     {
         $result = $this->callPrivate('buildOkFinding', [], null);
 
-        $this->assertSame('OK', $result['finding_type']);
+        $this->assertSame(FindingType::OK, $result['finding_type']);
         $this->assertSame('unknown', $result['details']['protocol']);
         $this->assertNull($result['details']['days_remaining']);
     }
@@ -311,7 +315,7 @@ class ScanServiceAnalysisTest extends TestCase
         $domain = new Domain();
         $domain->setFqdn('example.com');
         $domain->setPort(443);
-        $domain->setStatus('inactive');
+        $domain->setStatus(DomainStatus::INACTIVE);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/Deaktivierte/');

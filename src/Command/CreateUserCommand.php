@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Entity\User;
+use App\Enum\UserRole;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -70,7 +71,7 @@ HELP);
 
         $user = new User();
         $user->setUsername($username);
-        $user->setRole($role);
+        $user->setRole(UserRole::from($role));
         $user->setEmail($email);
         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
 

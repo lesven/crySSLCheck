@@ -5,6 +5,7 @@ namespace App\Tests\Integration\Controller;
 use App\Controller\DomainController;
 use App\Entity\Domain;
 use App\Entity\User;
+use App\Enum\UserRole;
 use App\Repository\DomainRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -38,7 +39,7 @@ class DomainControllerTest extends WebTestCase
         $user = new User();
         $user->setUsername($username);
         $user->setEmail($username . '@example.com');
-        $user->setRole($role);
+        $user->setRole(UserRole::from($role));
         $user->setPassword($passwordHasher->hashPassword($user, 'Test123!@#'));
 
         $em->persist($user);

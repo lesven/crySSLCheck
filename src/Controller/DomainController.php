@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Domain;
+use App\Enum\DomainStatus;
 use App\Repository\DomainRepository;
 use App\Service\MailService;
 use App\Service\ValidationService;
@@ -112,7 +113,7 @@ class DomainController extends AbstractController
                     $status = null;
                     if ($statusCol !== false) {
                         $rawStatus = strtolower(trim($row[$statusCol] ?? ''));
-                        $status    = in_array($rawStatus, ['active', 'inactive'], true) ? $rawStatus : null;
+                        $status    = DomainStatus::tryFrom($rawStatus);
                     }
 
                     $existing = $this->domainRepository->findOneBy(['fqdn' => $fqdn, 'port' => $port]);

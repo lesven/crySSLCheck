@@ -4,6 +4,7 @@ namespace App\Tests\Integration\Controller;
 
 use App\Controller\SecurityController;
 use App\Entity\User;
+use App\Enum\UserRole;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -35,7 +36,7 @@ class SecurityControllerTest extends WebTestCase
         $user = new User();
         $user->setUsername($username);
         $user->setEmail($username . '@example.com');
-        $user->setRole($role);
+        $user->setRole(UserRole::from($role));
         $user->setPassword($passwordHasher->hashPassword($user, $password));
 
         $em->persist($user);

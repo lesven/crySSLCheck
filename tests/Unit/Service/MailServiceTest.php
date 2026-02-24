@@ -5,6 +5,8 @@ namespace App\Tests\Unit\Service;
 use App\Entity\Domain;
 use App\Entity\Finding;
 use App\Entity\ScanRun;
+use App\Enum\FindingType;
+use App\Enum\Severity;
 use App\Service\MailService;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -39,7 +41,7 @@ class MailServiceTest extends TestCase
         );
     }
 
-    private function createFinding(string $type = 'CERT_EXPIRY', string $severity = 'high'): array
+    private function createFinding(FindingType $type = FindingType::CERT_EXPIRY, Severity $severity = Severity::HIGH): array
     {
         $domain = new Domain();
         $domain->setFqdn('example.com');
@@ -135,7 +137,7 @@ class MailServiceTest extends TestCase
     public function testSendFindingAlertSendsMailAndReturnsTrue(): void
     {
         $service = $this->createService(['alert@example.com']);
-        [$domain, $finding] = $this->createFinding('CERT_EXPIRY', 'high');
+        [$domain, $finding] = $this->createFinding(FindingType::CERT_EXPIRY, Severity::HIGH);
 
         $this->mailer
             ->expects($this->once())

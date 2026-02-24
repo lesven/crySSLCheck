@@ -5,6 +5,9 @@ namespace App\Tests\Integration\Repository;
 use App\Entity\Domain;
 use App\Entity\Finding;
 use App\Entity\ScanRun;
+use App\Enum\FindingStatus;
+use App\Enum\FindingType;
+use App\Enum\Severity;
 use App\Repository\FindingRepository;
 use App\Tests\Integration\IntegrationTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -42,9 +45,9 @@ class FindingRepositoryTest extends IntegrationTestCase
     private function createFinding(
         Domain $domain,
         ScanRun $scanRun,
-        string $type = 'CERT_EXPIRY',
-        string $severity = 'high',
-        string $status = 'new',
+        FindingType $type = FindingType::CERT_EXPIRY,
+        Severity $severity = Severity::HIGH,
+        FindingStatus $status = FindingStatus::NEW,
         array $details = [],
     ): Finding {
         $finding = new Finding();
@@ -71,8 +74,8 @@ class FindingRepositoryTest extends IntegrationTestCase
     {
         $domain  = $this->createDomain();
         $scanRun = $this->createScanRun();
-        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY');
-        $this->createFinding($domain, $scanRun, 'TLS_VERSION');
+        $this->createFinding($domain, $scanRun, FindingType::CERT_EXPIRY);
+        $this->createFinding($domain, $scanRun, FindingType::TLS_VERSION);
         $this->em->flush();
 
         $result = $this->repository->findPaginated(10, 0);
@@ -84,7 +87,7 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain  = $this->createDomain();
         $scanRun = $this->createScanRun();
         for ($i = 0; $i < 5; $i++) {
-            $this->createFinding($domain, $scanRun, 'CERT_EXPIRY');
+            $this->createFinding($domain, $scanRun, FindingType::CERT_EXPIRY);
         }
         $this->em->flush();
 
@@ -97,7 +100,7 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain  = $this->createDomain();
         $scanRun = $this->createScanRun();
         for ($i = 0; $i < 5; $i++) {
-            $this->createFinding($domain, $scanRun, 'CERT_EXPIRY');
+            $this->createFinding($domain, $scanRun, FindingType::CERT_EXPIRY);
         }
         $this->em->flush();
 
@@ -112,13 +115,13 @@ class FindingRepositoryTest extends IntegrationTestCase
     {
         $domain  = $this->createDomain();
         $scanRun = $this->createScanRun();
-        $this->createFinding($domain, $scanRun, 'OK', 'ok');
-        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY', 'high');
+        $this->createFinding($domain, $scanRun, FindingType::OK, Severity::OK);
+        $this->createFinding($domain, $scanRun, FindingType::CERT_EXPIRY, Severity::HIGH);
         $this->em->flush();
 
         $result = $this->repository->findPaginated(10, 0, problemsOnly: true);
         $this->assertCount(1, $result);
-        $this->assertSame('CERT_EXPIRY', $result[0]->getFindingType());
+        $this->assertSame(FindingType::CERT_EXPIRY, $result[0]->getFindingType());
     }
 
     public function testFindPaginatedFiltersByRunId(): void
@@ -126,13 +129,13 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY');
-        $this->createFinding($domain, $scanRun2, 'TLS_VERSION');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY);
+        $this->createFinding($domain, $scanRun2, FindingType::TLS_VERSION);
         $this->em->flush();
 
         $result = $this->repository->findPaginated(10, 0, runId: $scanRun1->getId());
         $this->assertCount(1, $result);
-        $this->assertSame('CERT_EXPIRY', $result[0]->getFindingType());
+        $this->assertSame(FindingType::CERT_EXPIRY, $result[0]->getFindingType());
     }
 
     // ── countFiltered ─────────────────────────────────────────────────────────
@@ -146,8 +149,8 @@ class FindingRepositoryTest extends IntegrationTestCase
     {
         $domain  = $this->createDomain();
         $scanRun = $this->createScanRun();
-        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY');
-        $this->createFinding($domain, $scanRun, 'TLS_VERSION');
+        $this->createFinding($domain, $scanRun, FindingType::CERT_EXPIRY);
+        $this->createFinding($domain, $scanRun, FindingType::TLS_VERSION);
         $this->em->flush();
 
         $this->assertSame(2, $this->repository->countFiltered());
@@ -157,8 +160,8 @@ class FindingRepositoryTest extends IntegrationTestCase
     {
         $domain  = $this->createDomain();
         $scanRun = $this->createScanRun();
-        $this->createFinding($domain, $scanRun, 'OK', 'ok');
-        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY', 'high');
+        $this->createFinding($domain, $scanRun, FindingType::OK, Severity::OK);
+        $this->createFinding($domain, $scanRun, FindingType::CERT_EXPIRY, Severity::HIGH);
         $this->em->flush();
 
         $this->assertSame(1, $this->repository->countFiltered(problemsOnly: true));
@@ -169,9 +172,9 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY');
-        $this->createFinding($domain, $scanRun1, 'TLS_VERSION');
-        $this->createFinding($domain, $scanRun2, 'CHAIN_ERROR');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY);
+        $this->createFinding($domain, $scanRun1, FindingType::TLS_VERSION);
+        $this->createFinding($domain, $scanRun2, FindingType::CHAIN_ERROR);
         $this->em->flush();
 
         $this->assertSame(2, $this->repository->countFiltered(runId: $scanRun1->getId()));
@@ -186,7 +189,7 @@ class FindingRepositoryTest extends IntegrationTestCase
         $scanRun = $this->createScanRun();
         $this->em->flush();
 
-        $isKnown = $this->repository->isKnownFinding($domain->getId(), 'CERT_EXPIRY', $scanRun->getId());
+        $isKnown = $this->repository->isKnownFinding($domain->getId(), FindingType::CERT_EXPIRY, $scanRun->getId());
         $this->assertFalse($isKnown);
     }
 
@@ -195,10 +198,10 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY', 'high', 'new');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY, Severity::HIGH, FindingStatus::NEW);
         $this->em->flush();
 
-        $isKnown = $this->repository->isKnownFinding($domain->getId(), 'CERT_EXPIRY', $scanRun2->getId());
+        $isKnown = $this->repository->isKnownFinding($domain->getId(), FindingType::CERT_EXPIRY, $scanRun2->getId());
         $this->assertTrue($isKnown);
     }
 
@@ -207,10 +210,10 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY', 'high', 'new');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY, Severity::HIGH, FindingStatus::NEW);
         $this->em->flush();
 
-        $isKnown = $this->repository->isKnownFinding($domain->getId(), 'TLS_VERSION', $scanRun2->getId());
+        $isKnown = $this->repository->isKnownFinding($domain->getId(), FindingType::TLS_VERSION, $scanRun2->getId());
         $this->assertFalse($isKnown);
     }
 
@@ -219,10 +222,10 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY', 'high', 'resolved');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY, Severity::HIGH, FindingStatus::RESOLVED);
         $this->em->flush();
 
-        $isKnown = $this->repository->isKnownFinding($domain->getId(), 'CERT_EXPIRY', $scanRun2->getId());
+        $isKnown = $this->repository->isKnownFinding($domain->getId(), FindingType::CERT_EXPIRY, $scanRun2->getId());
         $this->assertFalse($isKnown);
     }
 
@@ -231,10 +234,10 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'TLS_VERSION', 'high', 'known');
+        $this->createFinding($domain, $scanRun1, FindingType::TLS_VERSION, Severity::HIGH, FindingStatus::KNOWN);
         $this->em->flush();
 
-        $isKnown = $this->repository->isKnownFinding($domain->getId(), 'TLS_VERSION', $scanRun2->getId());
+        $isKnown = $this->repository->isKnownFinding($domain->getId(), FindingType::TLS_VERSION, $scanRun2->getId());
         $this->assertTrue($isKnown);
     }
 
@@ -242,11 +245,11 @@ class FindingRepositoryTest extends IntegrationTestCase
     {
         $domain  = $this->createDomain();
         $scanRun = $this->createScanRun();
-        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY', 'high', 'new');
+        $this->createFinding($domain, $scanRun, FindingType::CERT_EXPIRY, Severity::HIGH, FindingStatus::NEW);
         $this->em->flush();
 
         // Checking within the same run – should be false (not looking at current run)
-        $isKnown = $this->repository->isKnownFinding($domain->getId(), 'CERT_EXPIRY', $scanRun->getId());
+        $isKnown = $this->repository->isKnownFinding($domain->getId(), FindingType::CERT_EXPIRY, $scanRun->getId());
         $this->assertFalse($isKnown);
     }
 
@@ -267,12 +270,12 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY', 'high', 'new');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY, Severity::HIGH, FindingStatus::NEW);
         $this->em->flush();
 
         $result = $this->repository->findPreviousRunFindings($domain->getId(), $scanRun2->getId());
         $this->assertCount(1, $result);
-        $this->assertSame('CERT_EXPIRY', $result[0]->getFindingType());
+        $this->assertSame(FindingType::CERT_EXPIRY, $result[0]->getFindingType());
     }
 
     public function testFindPreviousRunFindingsExcludesResolvedFindings(): void
@@ -280,7 +283,7 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY', 'high', 'resolved');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY, Severity::HIGH, FindingStatus::RESOLVED);
         $this->em->flush();
 
         $result = $this->repository->findPreviousRunFindings($domain->getId(), $scanRun2->getId());
@@ -292,7 +295,7 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'OK', 'ok', 'new');
+        $this->createFinding($domain, $scanRun1, FindingType::OK, Severity::OK, FindingStatus::NEW);
         $this->em->flush();
 
         $result = $this->repository->findPreviousRunFindings($domain->getId(), $scanRun2->getId());
@@ -303,7 +306,7 @@ class FindingRepositoryTest extends IntegrationTestCase
     {
         $domain  = $this->createDomain();
         $scanRun = $this->createScanRun();
-        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY', 'high', 'new');
+        $this->createFinding($domain, $scanRun, FindingType::CERT_EXPIRY, Severity::HIGH, FindingStatus::NEW);
         $this->em->flush();
 
         $result = $this->repository->findPreviousRunFindings($domain->getId(), $scanRun->getId());
@@ -328,8 +331,8 @@ class FindingRepositoryTest extends IntegrationTestCase
         $scanRun2->setStatus('success');
         $this->em->persist($scanRun2);
 
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY');
-        $this->createFinding($domain, $scanRun2, 'TLS_VERSION');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY);
+        $this->createFinding($domain, $scanRun2, FindingType::TLS_VERSION);
         $this->em->flush();
 
         $latestRunId = $this->repository->findLatestRunId();
@@ -349,12 +352,12 @@ class FindingRepositoryTest extends IntegrationTestCase
         $domain   = $this->createDomain();
         $scanRun1 = $this->createScanRun();
         $scanRun2 = $this->createScanRun();
-        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY');
-        $this->createFinding($domain, $scanRun2, 'TLS_VERSION');
+        $this->createFinding($domain, $scanRun1, FindingType::CERT_EXPIRY);
+        $this->createFinding($domain, $scanRun2, FindingType::TLS_VERSION);
         $this->em->flush();
 
         $result = $this->repository->findByRunId($scanRun1->getId());
         $this->assertCount(1, $result);
-        $this->assertSame('CERT_EXPIRY', $result[0]->getFindingType());
+        $this->assertSame(FindingType::CERT_EXPIRY, $result[0]->getFindingType());
     }
 }

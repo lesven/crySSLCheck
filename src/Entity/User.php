@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\UserRole;
 use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -22,8 +23,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(name: 'password_hash')]
     private string $password;
 
-    #[ORM\Column(length: 20, options: ['default' => 'auditor'])]
-    private string $role = 'auditor';
+    #[ORM\Column(length: 20, enumType: UserRole::class, options: ['default' => 'auditor'])]
+    private UserRole $role = UserRole::AUDITOR;
 
     #[ORM\Column(length: 255, options: ['default' => 'example@example.com'])]
     private string $email = 'example@example.com';
@@ -55,15 +56,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function getRoles(): array
     {
-        return ['ROLE_' . strtoupper($this->role)];
+        return ['ROLE_' . strtoupper($this->role->value)];
     }
 
-    public function getRole(): string
+    public function getRole(): UserRole
     {
         return $this->role;
     }
 
-    public function setRole(string $role): static
+    public function setRole(UserRole $role): static
     {
         $this->role = $role;
 
@@ -72,7 +73,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->role === UserRole::ADMIN;
     }
 
     public function getPassword(): string

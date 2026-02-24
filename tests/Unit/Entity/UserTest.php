@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Entity;
 
 use App\Entity\User;
+use App\Enum\UserRole;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -10,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(User::class)]
 class UserTest extends TestCase
 {
-    private function createUser(string $username = 'testuser', string $role = 'auditor'): User
+    private function createUser(string $username = 'testuser', UserRole $role = UserRole::AUDITOR): User
     {
         $user = new User();
         $user->setUsername($username);
@@ -24,7 +25,7 @@ class UserTest extends TestCase
     public function testDefaultRoleIsAuditor(): void
     {
         $user = new User();
-        $this->assertSame('auditor', $user->getRole());
+        $this->assertSame(UserRole::AUDITOR, $user->getRole());
     }
 
     public function testDefaultEmailIsExampleEmail(): void
@@ -67,16 +68,16 @@ class UserTest extends TestCase
 
     public function testSetAndGetRole(): void
     {
-        $user = $this->createUser('testuser', 'admin');
-        $this->assertSame('admin', $user->getRole());
+        $user = $this->createUser('testuser', UserRole::ADMIN);
+        $this->assertSame(UserRole::ADMIN, $user->getRole());
 
-        $user->setRole('auditor');
-        $this->assertSame('auditor', $user->getRole());
+        $user->setRole(UserRole::AUDITOR);
+        $this->assertSame(UserRole::AUDITOR, $user->getRole());
     }
 
     public function testGetRolesReturnsArrayWithRolePrefix(): void
     {
-        $user = $this->createUser('testuser', 'admin');
+        $user = $this->createUser('testuser', UserRole::ADMIN);
         $roles = $user->getRoles();
         
         $this->assertIsArray($roles);
@@ -85,7 +86,7 @@ class UserTest extends TestCase
 
     public function testGetRolesReturnsAuditorRole(): void
     {
-        $user = $this->createUser('testuser', 'auditor');
+        $user = $this->createUser('testuser', UserRole::AUDITOR);
         $roles = $user->getRoles();
         
         $this->assertIsArray($roles);
@@ -94,13 +95,13 @@ class UserTest extends TestCase
 
     public function testIsAdminReturnsTrueForAdmin(): void
     {
-        $user = $this->createUser('admin', 'admin');
+        $user = $this->createUser('admin', UserRole::ADMIN);
         $this->assertTrue($user->isAdmin());
     }
 
     public function testIsAdminReturnsFalseForAuditor(): void
     {
-        $user = $this->createUser('auditor', 'auditor');
+        $user = $this->createUser('auditor', UserRole::AUDITOR);
         $this->assertFalse($user->isAdmin());
     }
 
@@ -136,7 +137,7 @@ class UserTest extends TestCase
     public function testSetRoleReturnsUserForFluentInterface(): void
     {
         $user = new User();
-        $result = $user->setRole('admin');
+        $result = $user->setRole(UserRole::ADMIN);
         
         $this->assertInstanceOf(User::class, $result);
         $this->assertSame($user, $result);
@@ -152,7 +153,7 @@ class UserTest extends TestCase
     }
 
     #[DataProvider('roleTestCaseProvider')]
-    public function testRoleConversion(string $role, string $expectedRoleString): void
+    public function testRoleConversion(UserRole $role, string $expectedRoleString): void
     {
         $user = $this->createUser('testuser', $role);
         $roles = $user->getRoles();
@@ -163,8 +164,8 @@ class UserTest extends TestCase
     public static function roleTestCaseProvider(): array
     {
         return [
-            'admin role' => ['admin', 'ROLE_ADMIN'],
-            'auditor role' => ['auditor', 'ROLE_AUDITOR'],
+            'admin role'   => [UserRole::ADMIN, 'ROLE_ADMIN'],
+            'auditor role' => [UserRole::AUDITOR, 'ROLE_AUDITOR'],
         ];
     }
 }

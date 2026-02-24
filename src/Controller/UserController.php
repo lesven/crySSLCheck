@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Enum\UserRole;
 use App\Repository\UserRepository;
 use App\Service\ValidationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -73,7 +74,7 @@ class UserController extends AbstractController
                 if (empty($errors)) {
                     $user = new User();
                     $user->setUsername($username);
-                    $user->setRole($role);
+                    $user->setRole(UserRole::from($role));
                     $user->setEmail($email);
                     $user->setPassword($this->passwordHasher->hashPassword($user, $password));
                     $this->entityManager->persist($user);
@@ -103,7 +104,7 @@ class UserController extends AbstractController
 
         $errors = [];
         $username = $user->getUsername();
-        $role = $user->getRole();
+        $role = $user->getRole()->value;
         $email = $user->getEmail();
 
         if ($request->isMethod('POST')) {
@@ -146,7 +147,7 @@ class UserController extends AbstractController
 
                 if (empty($errors)) {
                     $user->setUsername($username);
-                    $user->setRole($role);
+                    $user->setRole(UserRole::from($role));
                     $user->setEmail($email);
                     if ($password !== '') {
                         $user->setPassword($this->passwordHasher->hashPassword($user, $password));

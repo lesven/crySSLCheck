@@ -5,6 +5,9 @@ namespace App\Service;
 use App\Entity\Domain;
 use App\Entity\Finding;
 use App\Entity\ScanRun;
+use App\Enum\FindingStatus;
+use App\Enum\FindingType;
+use App\Enum\Severity;
 use App\Repository\DomainRepository;
 use App\Repository\FindingRepository;
 use App\Repository\ScanRunRepository;
@@ -62,7 +65,7 @@ class ScanService
 
                 $allFailed = false;
                 foreach ($scanFindings as $f) {
-                    if (in_array($f['finding_type'], ['UNREACHABLE', 'ERROR'])) {
+                    if (in_array($f['finding_type'], [FindingType::UNREACHABLE, FindingType::ERROR])) {
                         $hasErrors = true;
                     }
                 }
@@ -73,10 +76,10 @@ class ScanService
                 $finding = new Finding();
                 $finding->setDomain($domain);
                 $finding->setScanRun($scanRun);
-                $finding->setFindingType('ERROR');
-                $finding->setSeverity('low');
+                $finding->setFindingType(FindingType::ERROR);
+                $finding->setSeverity(Severity::LOW);
                 $finding->setDetails(['error' => $e->getMessage()]);
-                $finding->setStatus('new');
+                $finding->setStatus(FindingStatus::NEW);
                 $this->entityManager->persist($finding);
                 $this->entityManager->flush();
             }
@@ -106,7 +109,7 @@ class ScanService
 
         $hasErrors = false;
         foreach ($scanFindings as $f) {
-            if (in_array($f['finding_type'], ['UNREACHABLE', 'ERROR'])) {
+            if (in_array($f['finding_type'], [FindingType::UNREACHABLE, FindingType::ERROR])) {
                 $hasErrors = true;
             }
         }
@@ -140,16 +143,16 @@ class ScanService
 
         if ($result === null) {
             return [[
-                'finding_type' => 'UNREACHABLE',
-                'severity'     => 'low',
+                'finding_type' => FindingType::UNREACHABLE,
+                'severity'     => Severity::LOW,
                 'details'      => ['error' => "Host {$fqdn}:{$port} nicht erreichbar (Timeout)"],
             ]];
         }
 
         if (isset($result['error'])) {
             return [[
-                'finding_type' => 'ERROR',
-                'severity'     => 'low',
+                'finding_type' => FindingType::ERROR,
+                'severity'     => Severity::LOW,
                 'details'      => ['error' => $result['error']],
             ]];
         }
@@ -189,10 +192,10 @@ class ScanService
         }
 
         $severity = match (true) {
-            $daysRemaining < 0  => 'critical',
-            $daysRemaining <= 7  => 'high',
-            $daysRemaining <= 14 => 'medium',
-            $daysRemaining <= 30 => 'low',
+            $daysRemaining < 0  => Severity::CRITICAL,
+            $daysRemaining <= 7  => Severity::HIGH,
+            $daysRemaining <= 14 => Severity::MEDIUM,
+            $daysRemaining <= 30 => Severity::LOW,
             default              => null,
         };
 
@@ -201,7 +204,7 @@ class ScanService
         }
 
         return [
-            'finding_type' => 'CERT_EXPIRY',
+            'finding_type' => FindingType::CERT_EXPIRY,
             'severity'     => $severity,
             'details'      => [
                 'expiry_date'    => $result['valid_to'],
@@ -221,8 +224,8 @@ class ScanService
         }
 
         return [
-            'finding_type' => 'TLS_VERSION',
-            'severity'     => 'high',
+            'finding_type' => FindingType::TLS_VERSION,
+            'severity'     => Severity::HIGH,
             'details'      => [
                 'protocol' => $result['protocol'],
                 'message'  => "Unsichere TLS-Version: {$result['protocol']}",
@@ -237,8 +240,8 @@ class ScanService
         }
 
         return [
-            'finding_type' => 'CHAIN_ERROR',
-            'severity'     => 'high',
+            'finding_type' => FindingType::CHAIN_ERROR,
+            'severity'     => Severity::HIGH,
             'details'      => ['error' => $result['chain_error']],
         ];
     }
@@ -256,8 +259,8 @@ class ScanService
         }
 
         return [
-            'finding_type' => 'RSA_KEY_LENGTH',
-            'severity'     => ($bits < 1024 ? 'critical' : 'high'),
+            'finding_type' => FindingType::RSA_KEY_LENGTH,
+            'severity'     => ($bits < 1024 ? Severity::CRITICAL : Severity::HIGH),
             'details'      => [
                 'key_bits' => $bits,
                 'message'  => "RSA-Schlüssellänge zu kurz: {$bits} bits (empfohlen >= {$this->minRsaKeyBits})",
@@ -268,8 +271,8 @@ class ScanService
     private function buildOkFinding(array $result, ?int $daysRemaining): array
     {
         return [
-            'finding_type' => 'OK',
-            'severity'     => 'ok',
+            'finding_type' => FindingType::OK,
+            'severity'     => Severity::OK,
             'details'      => [
                 'protocol'        => $result['protocol'] ?? 'unknown',
                 'cipher_name'     => $result['cipher_name'] ?? 'unknown',
@@ -287,8 +290,8 @@ class ScanService
     }
 
     /**
-     * @param array<array{finding_type: string, severity: string, details: array}> $scanFindings
-     * @return array<array{finding_type: string, severity: string, details: array, id: int, status: string}>
+     * @param array<array{finding_type: FindingType, severity: Severity, details: array}> $scanFindings
+     * @return array<array{finding_type: string, severity: string, details: array, status: string}>
      */
     private function persistFindings(Domain $domain, ScanRun $scanRun, array $scanFindings): array
     {
@@ -300,7 +303,7 @@ class ScanService
                 $rawFinding['finding_type'],
                 $scanRun->getId()
             );
-            $status = $isKnown ? 'known' : 'new';
+            $status = $isKnown ? FindingStatus::KNOWN : FindingStatus::NEW;
 
             $finding = new Finding();
             $finding->setDomain($domain);
@@ -312,35 +315,40 @@ class ScanService
             $this->entityManager->persist($finding);
 
             $debugSubject = sprintf('[TLS Monitor] %s – %s für %s:%d',
-                $rawFinding['severity'],
-                $rawFinding['finding_type'],
+                $rawFinding['severity']->value,
+                $rawFinding['finding_type']->value,
                 $domain->getFqdn(),
                 $domain->getPort(),
             );
 
-            $isUnreachableType = in_array($rawFinding['finding_type'], ['UNREACHABLE', 'ERROR']);
-            $severityQualifies = in_array($rawFinding['severity'], ['high', 'critical'])
+            $isUnreachableType = in_array($rawFinding['finding_type'], [FindingType::UNREACHABLE, FindingType::ERROR]);
+            $severityQualifies = in_array($rawFinding['severity'], [Severity::HIGH, Severity::CRITICAL])
                 || ($isUnreachableType && $this->notifyOnUnreachable);
 
-            if ($status !== 'new') {
-                $this->mailService->recordSkipped($debugSubject, 'Finding bereits bekannt (status: ' . $status . ')');
+            if ($status !== FindingStatus::NEW) {
+                $this->mailService->recordSkipped($debugSubject, 'Finding bereits bekannt (status: ' . $status->value . ')');
             } elseif ($isUnreachableType && !$this->notifyOnUnreachable) {
-                $this->mailService->recordSkipped($debugSubject, 'Typ ' . $rawFinding['finding_type'] . ' – Benachrichtigung deaktiviert (SCAN_NOTIFY_UNREACHABLE=false)');
+                $this->mailService->recordSkipped($debugSubject, 'Typ ' . $rawFinding['finding_type']->value . ' – Benachrichtigung deaktiviert (SCAN_NOTIFY_UNREACHABLE=false)');
             } elseif (!$severityQualifies) {
-                $this->mailService->recordSkipped($debugSubject, 'Severity zu niedrig (' . $rawFinding['severity'] . ')');
+                $this->mailService->recordSkipped($debugSubject, 'Severity zu niedrig (' . $rawFinding['severity']->value . ')');
             } else {
                 $sent = $this->mailService->sendFindingAlert($domain, $finding);
                 if (!$sent) {
                     $this->logger->warning('ScanService: SMTP-Alarm-Mail fehlgeschlagen', [
                         'domain'   => $domain->getFqdn(),
                         'port'     => $domain->getPort(),
-                        'finding'  => $rawFinding['finding_type'],
-                        'severity' => $rawFinding['severity'],
+                        'finding'  => $rawFinding['finding_type']->value,
+                        'severity' => $rawFinding['severity']->value,
                     ]);
                 }
             }
 
-            $results[] = array_merge($rawFinding, ['status' => $status]);
+            $results[] = [
+                'finding_type' => $rawFinding['finding_type']->value,
+                'severity'     => $rawFinding['severity']->value,
+                'details'      => $rawFinding['details'],
+                'status'       => $status->value,
+            ];
         }
 
         // Resolve previous findings that no longer appear

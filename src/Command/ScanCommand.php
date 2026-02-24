@@ -80,7 +80,7 @@ class ScanCommand extends Command
             // Summary by finding type
             $summary = [];
             foreach ($findings as $finding) {
-                $type = $finding->getFindingType();
+                $type = $finding->getFindingType()->value;
                 $summary[$type] = ($summary[$type] ?? 0) + 1;
             }
 

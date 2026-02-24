@@ -5,6 +5,8 @@ namespace App\Tests\Integration\Controller;
 use App\Controller\ScanController;
 use App\Entity\Domain;
 use App\Entity\User;
+use App\Enum\DomainStatus;
+use App\Enum\UserRole;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -36,7 +38,7 @@ class ScanControllerTest extends WebTestCase
         $user = new User();
         $user->setUsername($username);
         $user->setEmail($username . '@example.com');
-        $user->setRole($role);
+        $user->setRole(UserRole::from($role));
         $user->setPassword($passwordHasher->hashPassword($user, 'Test123!@#'));
 
         $em->persist($user);
@@ -53,7 +55,7 @@ class ScanControllerTest extends WebTestCase
         $domain->setFqdn($fqdn);
         $domain->setPort($port);
         $domain->setDescription('Test domain');
-        $domain->setStatus($status);
+        $domain->setStatus(DomainStatus::from($status));
 
         $em->persist($domain);
         $em->flush();

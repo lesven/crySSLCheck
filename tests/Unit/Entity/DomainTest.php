@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Entity;
 
 use App\Entity\Domain;
+use App\Enum\DomainStatus;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -22,7 +23,7 @@ class DomainTest extends TestCase
     public function testDefaultStatusIsActive(): void
     {
         $domain = new Domain();
-        $this->assertSame('active', $domain->getStatus());
+        $this->assertSame(DomainStatus::ACTIVE, $domain->getStatus());
         $this->assertTrue($domain->isActive());
     }
 
@@ -70,34 +71,34 @@ class DomainTest extends TestCase
     public function testIsActiveWhenStatusIsActive(): void
     {
         $domain = $this->createDomain();
-        $domain->setStatus('active');
+        $domain->setStatus(DomainStatus::ACTIVE);
         $this->assertTrue($domain->isActive());
     }
 
     public function testIsNotActiveWhenStatusIsInactive(): void
     {
         $domain = $this->createDomain();
-        $domain->setStatus('inactive');
+        $domain->setStatus(DomainStatus::INACTIVE);
         $this->assertFalse($domain->isActive());
     }
 
     public function testToggleStatusFromActiveToInactive(): void
     {
         $domain = $this->createDomain();
-        $this->assertSame('active', $domain->getStatus());
+        $this->assertSame(DomainStatus::ACTIVE, $domain->getStatus());
 
         $domain->toggleStatus();
-        $this->assertSame('inactive', $domain->getStatus());
+        $this->assertSame(DomainStatus::INACTIVE, $domain->getStatus());
         $this->assertFalse($domain->isActive());
     }
 
     public function testToggleStatusFromInactiveToActive(): void
     {
         $domain = $this->createDomain();
-        $domain->setStatus('inactive');
+        $domain->setStatus(DomainStatus::INACTIVE);
 
         $domain->toggleStatus();
-        $this->assertSame('active', $domain->getStatus());
+        $this->assertSame(DomainStatus::ACTIVE, $domain->getStatus());
         $this->assertTrue($domain->isActive());
     }
 
@@ -106,7 +107,7 @@ class DomainTest extends TestCase
         $domain = $this->createDomain();
         $domain->toggleStatus();
         $domain->toggleStatus();
-        $this->assertSame('active', $domain->getStatus());
+        $this->assertSame(DomainStatus::ACTIVE, $domain->getStatus());
     }
 
     public function testOnPrePersistSetsCreatedAt(): void

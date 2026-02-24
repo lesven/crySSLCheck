@@ -4,6 +4,7 @@ namespace App\Tests\Integration\Controller;
 
 use App\Controller\UserController;
 use App\Entity\User;
+use App\Enum\UserRole;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -35,7 +36,7 @@ class UserControllerTest extends WebTestCase
         $user = new User();
         $user->setUsername($username);
         $user->setEmail($username . '@example.com');
-        $user->setRole($role);
+        $user->setRole(UserRole::from($role));
         $user->setPassword($passwordHasher->hashPassword($user, 'Test123!@#'));
 
         $em->persist($user);
@@ -124,7 +125,7 @@ class UserControllerTest extends WebTestCase
         $this->assertNotNull($newUser);
         $this->assertSame('newuser', $newUser->getUsername());
         $this->assertSame('newuser@example.com', $newUser->getEmail());
-        $this->assertSame('auditor', $newUser->getRole());
+        $this->assertSame(UserRole::AUDITOR, $newUser->getRole());
     }
 
     public function testCreateUserWithExistingUsername(): void
@@ -272,7 +273,7 @@ class UserControllerTest extends WebTestCase
 
         $this->assertSame('updateduser', $updatedUser->getUsername());
         $this->assertSame('updated@example.com', $updatedUser->getEmail());
-        $this->assertSame('admin', $updatedUser->getRole());
+        $this->assertSame(UserRole::ADMIN, $updatedUser->getRole());
     }
 
     public function testEditUserAndChangePassword(): void
@@ -328,7 +329,7 @@ class UserControllerTest extends WebTestCase
         $stillAdmin = $userRepo->find($admin->getId());
 
         // Admin should still be admin
-        $this->assertSame('admin', $stillAdmin->getRole());
+        $this->assertSame(UserRole::ADMIN, $stillAdmin->getRole());
     }
 
     public function testEditNonExistentUserThrowsException(): void

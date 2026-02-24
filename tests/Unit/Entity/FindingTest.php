@@ -5,6 +5,9 @@ namespace App\Tests\Unit\Entity;
 use App\Entity\Domain;
 use App\Entity\Finding;
 use App\Entity\ScanRun;
+use App\Enum\FindingStatus;
+use App\Enum\FindingType;
+use App\Enum\Severity;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -12,7 +15,7 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(Finding::class)]
 class FindingTest extends TestCase
 {
-    private function createFinding(string $type = 'CERT_EXPIRY', string $severity = 'high'): Finding
+    private function createFinding(FindingType $type = FindingType::CERT_EXPIRY, Severity $severity = Severity::HIGH): Finding
     {
         $domain = new Domain();
         $domain->setFqdn('example.com');
@@ -33,7 +36,7 @@ class FindingTest extends TestCase
     public function testDefaultStatusIsNew(): void
     {
         $finding = new Finding();
-        $this->assertSame('new', $finding->getStatus());
+        $this->assertSame(FindingStatus::NEW, $finding->getStatus());
     }
 
     public function testDefaultDetailsIsEmptyArray(): void
@@ -50,14 +53,14 @@ class FindingTest extends TestCase
 
     public function testSetAndGetFindingType(): void
     {
-        $finding = $this->createFinding('TLS_VERSION');
-        $this->assertSame('TLS_VERSION', $finding->getFindingType());
+        $finding = $this->createFinding(FindingType::TLS_VERSION);
+        $this->assertSame(FindingType::TLS_VERSION, $finding->getFindingType());
     }
 
     public function testSetAndGetSeverity(): void
     {
-        $finding = $this->createFinding('OK', 'ok');
-        $this->assertSame('ok', $finding->getSeverity());
+        $finding = $this->createFinding(FindingType::OK, Severity::OK);
+        $this->assertSame(Severity::OK, $finding->getSeverity());
     }
 
     public function testSetAndGetDetails(): void
@@ -71,17 +74,17 @@ class FindingTest extends TestCase
     public function testSetAndGetStatus(): void
     {
         $finding = $this->createFinding();
-        $finding->setStatus('known');
-        $this->assertSame('known', $finding->getStatus());
+        $finding->setStatus(FindingStatus::KNOWN);
+        $this->assertSame(FindingStatus::KNOWN, $finding->getStatus());
     }
 
     public function testMarkResolvedSetsStatusToResolved(): void
     {
         $finding = $this->createFinding();
-        $this->assertSame('new', $finding->getStatus());
+        $this->assertSame(FindingStatus::NEW, $finding->getStatus());
 
         $finding->markResolved();
-        $this->assertSame('resolved', $finding->getStatus());
+        $this->assertSame(FindingStatus::RESOLVED, $finding->getStatus());
     }
 
     public function testOnPrePersistSetsCheckedAt(): void
@@ -118,26 +121,25 @@ class FindingTest extends TestCase
     }
 
     #[DataProvider('severityBadgeProvider')]
-    public function testGetSeverityBadgeClass(string $severity, string $expectedClass): void
+    public function testGetSeverityBadgeClass(Severity $severity, string $expectedClass): void
     {
-        $finding = $this->createFinding('CERT_EXPIRY', $severity);
+        $finding = $this->createFinding(FindingType::CERT_EXPIRY, $severity);
         $this->assertSame($expectedClass, $finding->getSeverityBadgeClass());
     }
 
     public static function severityBadgeProvider(): array
     {
         return [
-            'critical maps to danger'   => ['critical', 'danger'],
-            'high maps to warning'      => ['high', 'warning'],
-            'medium maps to info'       => ['medium', 'info'],
-            'low maps to secondary'     => ['low', 'secondary'],
-            'ok maps to success'        => ['ok', 'success'],
-            'unknown maps to success'   => ['unknown', 'success'],
+            'critical maps to danger'   => [Severity::CRITICAL, 'danger'],
+            'high maps to warning'      => [Severity::HIGH, 'warning'],
+            'medium maps to info'       => [Severity::MEDIUM, 'info'],
+            'low maps to secondary'     => [Severity::LOW, 'secondary'],
+            'ok maps to success'        => [Severity::OK, 'success'],
         ];
     }
 
     #[DataProvider('statusBadgeProvider')]
-    public function testGetStatusBadgeClass(string $status, string $expectedClass): void
+    public function testGetStatusBadgeClass(FindingStatus $status, string $expectedClass): void
     {
         $finding = $this->createFinding();
         $finding->setStatus($status);
@@ -147,10 +149,9 @@ class FindingTest extends TestCase
     public static function statusBadgeProvider(): array
     {
         return [
-            'new maps to danger'        => ['new', 'danger'],
-            'known maps to warning'     => ['known', 'warning'],
-            'resolved maps to success'  => ['resolved', 'success'],
-            'unknown maps to secondary' => ['other', 'secondary'],
+            'new maps to danger'        => [FindingStatus::NEW, 'danger'],
+            'known maps to warning'     => [FindingStatus::KNOWN, 'warning'],
+            'resolved maps to success'  => [FindingStatus::RESOLVED, 'success'],
         ];
     }
 }

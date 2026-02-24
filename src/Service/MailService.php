@@ -59,8 +59,8 @@ class MailService
 
         $subject = sprintf(
             '[TLS Monitor] %s – %s für %s:%d',
-            $finding->getSeverity(),
-            $finding->getFindingType(),
+            $finding->getSeverity()->value,
+            $finding->getFindingType()->value,
             $domain->getFqdn(),
             $domain->getPort(),
         );
@@ -75,8 +75,8 @@ class MailService
             . "=============================\n\n"
             . "Domain:       {$domain->getFqdn()}\n"
             . "Port:         {$domain->getPort()}\n"
-            . "Finding-Typ:  {$finding->getFindingType()}\n"
-            . "Severity:     {$finding->getSeverity()}\n"
+            . "Finding-Typ:  {$finding->getFindingType()->value}\n"
+            . "Severity:     {$finding->getSeverity()->value}\n"
             . "Zeitpunkt:    " . (new \DateTimeImmutable())->format('Y-m-d H:i:s') . "\n";
 
         if (isset($details['days_remaining'])) {
