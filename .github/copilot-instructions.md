@@ -68,7 +68,8 @@ All scan behaviour is driven by env vars (see `config/services.yaml` → `parame
 **Validation** is centralised in `ValidationService` (FQDN regex, port range, duplicate check). Controllers call it directly — no Symfony Form Validator constraints on entities.
 
 **Roles** are enforced via `access_control` in `config/packages/security.yaml`. Voter/annotation-based access checks are not used; controllers check `$this->isGranted('ROLE_ADMIN')` inline.
-
+Always check the tests with make test and fix all errors
+Always check the code with make lint and fix all errors
 ## Database
 
 SQLite file at `data/tls_monitor.sqlite`. Migrations live in `migrations/` and follow the naming convention `Version<YYYYMMDDNNNNNN>.php`. Generate new migrations with:
@@ -76,3 +77,5 @@ SQLite file at `data/tls_monitor.sqlite`. Migrations live in `migrations/` and f
 make console CMD="doctrine:migrations:diff"
 make console CMD="doctrine:migrations:migrate --no-interaction"
 ```
+
+

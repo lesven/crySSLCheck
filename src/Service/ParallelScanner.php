@@ -30,7 +30,7 @@ class ParallelScanner
      * Scans multiple domains in parallel batches.
      *
      * @param Domain[] $domains
-     * @return array<int, array{domain: Domain, findings: array, error: string|null}>
+     * @return array<int, array{domain: Domain, findings: array<int, array<string, mixed>>, error: string|null}>
      */
     public function scan(array $domains): array
     {
@@ -61,7 +61,7 @@ class ParallelScanner
      * Scans a single chunk of domains in parallel.
      *
      * @param Domain[] $chunk
-     * @return array<int, array{domain: Domain, findings: array, error: string|null}>
+     * @return array<int, array{domain: Domain, findings: array<int, array<string, mixed>>, error: string|null}>
      */
     private function scanChunk(array $chunk): array
     {
@@ -98,7 +98,7 @@ class ParallelScanner
      */
     protected function createProcess(Domain $domain): Process
     {
-        $phpBinary = PHP_BINARY ?: 'php';
+        $phpBinary = PHP_BINARY;
         $consolePath = $this->projectDir . '/bin/console';
 
         $process = new Process([
@@ -121,7 +121,7 @@ class ParallelScanner
     /**
      * Waits for a process to finish and parses its JSON output.
      *
-     * @return array{domain: Domain, findings: array, error: string|null}
+     * @return array{domain: Domain, findings: array<int, array<string, mixed>>, error: string|null}
      */
     private function collectResult(Process $process, Domain $domain): array
     {
