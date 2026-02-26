@@ -30,7 +30,10 @@ class ScanService
     ) {
     }
 
-    public function runFullScan(): ScanRun
+    /**
+     * @param callable(string $fqdn): void|null $onProgress Called after each domain is processed.
+     */
+    public function runFullScan(?callable $onProgress = null): ScanRun
     {
         $domains = $this->domainRepository->findActive();
 
@@ -52,7 +55,7 @@ class ScanService
 
         if ($this->config->scanConcurrency > 1) {
             // Parallel scan via subprocess workers
-            $scanResults = $this->parallelScanner->scan($domains);
+            $scanResults = $this->parallelScanner->scan($domains, $onProgress);
 
             foreach ($scanResults as $result) {
                 $domain = $result['domain'];
@@ -114,6 +117,10 @@ class ScanService
                     $finding->setStatus(FindingStatus::New->value);
                     $this->entityManager->persist($finding);
                     $this->entityManager->flush();
+                }
+
+                if ($onProgress !== null) {
+                    $onProgress($domain->getFqdn() . ':' . $domain->getPort());
                 }
             }
         }

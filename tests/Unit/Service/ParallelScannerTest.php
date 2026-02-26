@@ -16,22 +16,15 @@ use Symfony\Component\Process\Process;
 #[CoversClass(ParallelScanner::class)]
 class ParallelScannerTest extends TestCase
 {
-    // ── Chunking ──────────────────────────────────────────────────────────────
+    // ── Pool behaviour ─────────────────────────────────────────────────────────
 
-    public function testChunkingWithConcurrencyThreeAndSevenDomains(): void
+    public function testPoolReturnsAllResultsWithMoreDomainsThanConcurrency(): void
     {
         $config = new ScanConfiguration(scanConcurrency: 3);
         $scanner = new TestableParallelScanner(new NullLogger(), $config);
 
-        $domains = [];
-        for ($i = 0; $i < 7; $i++) {
-            $domain = new Domain();
-            $domain->setFqdn("example{$i}.com");
-            $domain->setPort(443);
-            $domains[] = $domain;
-        }
+        $domains = $this->createDomains(7);
 
-        // Configure mock processes to return successful JSON
         $scanner->setMockOutput(json_encode([
             ['finding_type' => 'OK', 'severity' => 'ok', 'details' => []],
         ]));
@@ -39,11 +32,11 @@ class ParallelScannerTest extends TestCase
         $results = $scanner->scan($domains);
 
         $this->assertCount(7, $results);
-        // 3 + 3 + 1 = 3 chunks
-        $this->assertSame(3, $scanner->getChunkCount());
+        // All 7 processes must have been created (pool fills slots as they free up).
+        $this->assertSame(7, $scanner->getProcessCount());
     }
 
-    public function testConcurrencyOneRunsSequentially(): void
+    public function testPoolWithConcurrencyOneRunsAllDomainsSequentially(): void
     {
         $config = new ScanConfiguration(scanConcurrency: 1);
         $scanner = new TestableParallelScanner(new NullLogger(), $config);
@@ -57,8 +50,46 @@ class ParallelScannerTest extends TestCase
         $results = $scanner->scan($domains);
 
         $this->assertCount(3, $results);
-        // With concurrency 1, we get 3 chunks of 1
-        $this->assertSame(3, $scanner->getChunkCount());
+        // With concurrency=1 the pool still processes all three, one at a time.
+        $this->assertSame(3, $scanner->getProcessCount());
+    }
+
+    public function testPoolInitiallyStartsAtMostConcurrencyProcesses(): void
+    {
+        $config = new ScanConfiguration(scanConcurrency: 2);
+        $scanner = new TestableParallelScanner(new NullLogger(), $config);
+
+        $domains = $this->createDomains(5);
+
+        $scanner->setMockOutput(json_encode([
+            ['finding_type' => 'OK', 'severity' => 'ok', 'details' => []],
+        ]));
+
+        $results = $scanner->scan($domains);
+
+        // All 5 domains scanned, no domain skipped.
+        $this->assertCount(5, $results);
+        $this->assertSame(5, $scanner->getProcessCount());
+    }
+
+    public function testPoolCallbackFiredForEveryDomain(): void
+    {
+        $config = new ScanConfiguration(scanConcurrency: 3);
+        $scanner = new TestableParallelScanner(new NullLogger(), $config);
+
+        $domains = $this->createDomains(5);
+
+        $scanner->setMockOutput(json_encode([
+            ['finding_type' => 'OK', 'severity' => 'ok', 'details' => []],
+        ]));
+
+        $callbackLabels = [];
+        $results = $scanner->scan($domains, function (string $label) use (&$callbackLabels): void {
+            $callbackLabels[] = $label;
+        });
+
+        $this->assertCount(5, $results);
+        $this->assertCount(5, $callbackLabels);
     }
 
     // ── Successful scan ───────────────────────────────────────────────────────
@@ -229,7 +260,6 @@ class TestableParallelScanner extends ParallelScanner
     private string $mockErrorOutput = '';
     private ?array $mockErrorOutputSequence = null;
     private ?\Throwable $mockException = null;
-    private int $chunkCount = 0;
     private int $processIndex = 0;
 
     public function __construct(
@@ -278,20 +308,19 @@ class TestableParallelScanner extends ParallelScanner
         $this->mockException = $exception;
     }
 
-    public function getChunkCount(): int
+    public function getProcessCount(): int
     {
-        return $this->chunkCount;
+        return $this->processIndex;
     }
 
     /**
      * @param Domain[] $domains
      * @return array<int, array{domain: Domain, findings: array, error: string|null}>
      */
-    public function scan(array $domains): array
+    public function scan(array $domains, ?callable $onDomainScanned = null): array
     {
-        $this->chunkCount = 0;
         $this->processIndex = 0;
-        return parent::scan($domains);
+        return parent::scan($domains, $onDomainScanned);
     }
 
     protected function createProcess(Domain $domain): Process
@@ -302,12 +331,6 @@ class TestableParallelScanner extends ParallelScanner
         $exitCode = $this->mockExitCodeSequence[$index] ?? $this->mockExitCode;
         $errorOutput = $this->mockErrorOutputSequence[$index] ?? $this->mockErrorOutput;
         $exception = ($index === 0 || $this->mockOutputSequence === null) ? $this->mockException : null;
-
-        // Track chunk boundaries by counting createProcess calls divided by chunk size
-        $concurrency = max(1, (new \ReflectionProperty(parent::class, 'config'))->getValue($this)->scanConcurrency);
-        if ($index % $concurrency === 0) {
-            $this->chunkCount++;
-        }
 
         return new MockProcess($output, $exitCode, $errorOutput, $exception);
     }
@@ -332,6 +355,11 @@ class MockProcess extends Process
     public function start(?callable $callback = null, array $env = []): void
     {
         $this->started = true;
+    }
+
+    public function isTerminated(): bool
+    {
+        return $this->started;
     }
 
     public function wait(?callable $callback = null): int

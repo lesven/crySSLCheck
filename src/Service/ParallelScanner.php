@@ -27,48 +27,34 @@ class ParallelScanner
     }
 
     /**
-     * Scans multiple domains in parallel batches.
+     * Scans multiple domains in parallel using a pool mechanism.
+     *
+     * As soon as one process finishes, the next domain from the queue is started
+     * immediately, so exactly SCAN_CONCURRENCY processes run at all times (until
+     * the queue is exhausted). This avoids the straggler-wait problem of the
+     * previous batch/chunk approach.
      *
      * @param Domain[] $domains
+     * @param callable(string $label): void|null $onDomainScanned Called immediately when each domain's scan process finishes.
      * @return array<int, array{domain: Domain, findings: array<int, array<string, mixed>>, error: string|null}>
      */
-    public function scan(array $domains): array
+    public function scan(array $domains, ?callable $onDomainScanned = null): array
     {
         $concurrency = max(1, $this->config->scanConcurrency);
-        $chunks = array_chunk($domains, $concurrency);
+        /** @var list<Domain> $queue */
+        $queue = array_values($domains);
+        /** @var array<int, array{process: Process, domain: Domain, done: bool}> $running */
+        $running = [];
         $results = [];
 
-        $this->logger->info('ParallelScanner: Starte parallelen Scan', [
+        $this->logger->info('ParallelScanner: Starte Pool-Scan', [
             'total_domains' => count($domains),
             'concurrency' => $concurrency,
-            'chunks' => count($chunks),
         ]);
 
-        foreach ($chunks as $chunkIndex => $chunk) {
-            $this->logger->debug('ParallelScanner: Starte Chunk', [
-                'chunk' => $chunkIndex + 1,
-                'domains' => count($chunk),
-            ]);
-
-            $chunkResults = $this->scanChunk($chunk);
-            $results = array_merge($results, $chunkResults);
-        }
-
-        return $results;
-    }
-
-    /**
-     * Scans a single chunk of domains in parallel.
-     *
-     * @param Domain[] $chunk
-     * @return array<int, array{domain: Domain, findings: array<int, array<string, mixed>>, error: string|null}>
-     */
-    private function scanChunk(array $chunk): array
-    {
-        /** @var array<int, array{process: Process, domain: Domain}> $running */
-        $running = [];
-
-        foreach ($chunk as $domain) {
+        // Fill the pool initially up to $concurrency slots.
+        while (!empty($queue) && count($running) < $concurrency) {
+            $domain = array_shift($queue);
             $process = $this->createProcess($domain);
             $process->start();
 
@@ -76,18 +62,52 @@ class ParallelScanner
                 'domain' => $domain->getFqdn(),
                 'port' => $domain->getPort(),
                 'pid' => $process->getPid(),
+                'queue_remaining' => count($queue),
             ]);
 
-            $running[] = [
-                'process' => $process,
-                'domain' => $domain,
-            ];
+            $running[] = ['process' => $process, 'domain' => $domain, 'done' => false];
         }
 
-        // Wait for all processes in this chunk to finish
-        $results = [];
-        foreach ($running as $item) {
-            $results[] = $this->collectResult($item['process'], $item['domain']);
+        // Poll until all running processes (and any queued ones) are done.
+        while (!empty($running)) {
+            foreach ($running as &$item) {
+                if ($item['done']) {
+                    continue;
+                }
+
+                if ($item['process']->isTerminated()) {
+                    $item['done'] = true;
+                    $results[] = $this->collectResult($item['process'], $item['domain']);
+
+                    if ($onDomainScanned !== null) {
+                        $onDomainScanned($item['domain']->getFqdn() . ':' . $item['domain']->getPort());
+                    }
+
+                    // Immediately fill the freed pool slot with the next queued domain.
+                    if (!empty($queue)) {
+                        $nextDomain = array_shift($queue);
+                        $nextProcess = $this->createProcess($nextDomain);
+                        $nextProcess->start();
+
+                        $this->logger->debug('ParallelScanner: Prozess gestartet (nachgerückt)', [
+                            'domain' => $nextDomain->getFqdn(),
+                            'port' => $nextDomain->getPort(),
+                            'pid' => $nextProcess->getPid(),
+                            'queue_remaining' => count($queue),
+                        ]);
+
+                        $running[] = ['process' => $nextProcess, 'domain' => $nextDomain, 'done' => false];
+                    }
+                }
+            }
+            unset($item);
+
+            // Compact finished entries; sleep only if there is still work to do.
+            $running = array_values(array_filter($running, static fn (array $i): bool => !$i['done']));
+
+            if (!empty($running)) {
+                usleep(100_000); // 100 ms polling interval
+            }
         }
 
         return $results;
