@@ -5,7 +5,7 @@ Symfony 7 PHP web application that monitors TLS/SSL certificates for configured 
 
 ## Architecture & Data Flow
 
-**Core flow:** `ScanCommand` (cron/manual) → `ScanService::runFullScan()` → `ScanService::scanDomain()` → PHP `stream_socket_client` with SSL context → findings persisted → `MailService::sendFindingAlert()` for qualifying findings.
+**Core flow:** `ScanCommand` (cron/manual) → `ScanService::runFullScan()` → `ParallelScanner::scan()` (batched subprocesses) → `ScanDomainCommand` → `ScanService::scanDomainByFqdn()` → PHP `stream_socket_client` with SSL context → JSON results collected → `FindingPersister::persistFindings()` → `MailService::sendFindingAlert()` for qualifying findings. When `SCAN_CONCURRENCY=1`, falls back to sequential in-process scanning.
 
 **Entities:**
 - `Domain` – FQDN + port combination to monitor (`status`: `active`/`inactive`)
@@ -53,6 +53,7 @@ All scan behaviour is driven by env vars (see `config/services.yaml` → `parame
 | `RETRY_COUNT` | 1 | Number of retries on unreachable |
 | `MIN_RSA_KEY_BITS` | 2048 | RSA key length threshold |
 | `NOTIFY_ON_UNREACHABLE` | false | Send alert on unreachable/error findings |
+| `SCAN_CONCURRENCY` | 5 | Max parallel domain scans (subprocesses) |
 | `ALLOW_IP_ADDRESSES` | true | Accept IP addresses as FQDN |
 | `ALERT_RECIPIENTS` | – | Comma-separated mail recipients |
 
@@ -61,6 +62,8 @@ All scan behaviour is driven by env vars (see `config/services.yaml` → `parame
 **TLS Check recovery:** When `stream_socket_client` fails with a certificate error, `ScanService::performTlsCheck()` retries with `verify_peer=false` to still extract cert metadata and reports a `CHAIN_ERROR` finding rather than `UNREACHABLE`.
 
 **`scanDomain()` returns raw arrays**, not entity objects. `persistFindings()` converts them to `Finding` entities, determines `new`/`known` status via `FindingRepository::isKnownFinding()`, and resolves previous findings that no longer appear in the current scan.
+
+**Parallel scanning:** When `SCAN_CONCURRENCY > 1`, `ParallelScanner` spawns Symfony Process subprocesses running `app:scan-domain {fqdn} {port}`. Each subprocess outputs JSON findings to stdout. The main process collects results and persists findings sequentially to avoid SQLite write-lock conflicts. Domains are processed in chunks of `SCAN_CONCURRENCY` size.
 
 **Validation** is centralised in `ValidationService` (FQDN regex, port range, duplicate check). Controllers call it directly — no Symfony Form Validator constraints on entities.
 

@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y \
 # PHP-Erweiterungen installieren
 RUN docker-php-ext-install pdo pdo_sqlite opcache
 
+# PCOV für Code-Coverage installieren
+RUN pecl install pcov && docker-php-ext-enable pcov
+
 # Apache-Module aktivieren
 RUN a2enmod rewrite
 

@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs shell clean ps scan create-user test test-unit test-integration test-coverage
+.PHONY: help build up down restart logs shell clean ps scan create-user test test-unit test-integration test-coverage lint
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Befehle:"
@@ -94,3 +94,6 @@ test-integration: ## Führt nur Integration Tests aus
 
 test-coverage: ## Führt Tests mit Code Coverage aus
 	docker compose exec -e APP_ENV=test tls-monitor php /var/www/html/bin/phpunit --coverage-html=var/coverage
+
+lint: ## Führt PHPStan statische Analyse aus
+	docker compose exec tls-monitor php -d memory_limit=512M /var/www/html/vendor/bin/phpstan analyse --no-progress
