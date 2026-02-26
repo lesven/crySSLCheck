@@ -165,7 +165,7 @@ class ScanService
      * Scans a domain by FQDN and port without requiring a Domain entity.
      * Used by ScanDomainCommand for parallel subprocess execution.
      *
-     * @return array<array{finding_type: string, severity: string, details: array}>
+     * @return array<int, array{finding_type: string, severity: string, details: array<string, mixed>}>
      */
     public function scanDomainByFqdn(string $fqdn, int $port): array
     {
