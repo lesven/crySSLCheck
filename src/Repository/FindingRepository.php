@@ -3,6 +3,8 @@
 namespace App\Repository;
 
 use App\Entity\Finding;
+use App\Enum\FindingStatus;
+use App\Enum\FindingType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -29,7 +31,7 @@ class FindingRepository extends ServiceEntityRepository
 
         if ($problemsOnly) {
             $qb->andWhere('f.findingType != :ok')
-               ->setParameter('ok', 'OK');
+               ->setParameter('ok', FindingType::Ok->value);
         }
 
         if ($runId !== null) {
@@ -47,7 +49,7 @@ class FindingRepository extends ServiceEntityRepository
 
         if ($problemsOnly) {
             $qb->andWhere('f.findingType != :ok')
-               ->setParameter('ok', 'OK');
+               ->setParameter('ok', FindingType::Ok->value);
         }
 
         if ($runId !== null) {
@@ -86,8 +88,8 @@ class FindingRepository extends ServiceEntityRepository
             ->andWhere('f.findingType != :ok')
             ->setParameter('domainId', $domainId)
             ->setParameter('currentRunId', $currentRunId)
-            ->setParameter('resolved', 'resolved')
-            ->setParameter('ok', 'OK')
+            ->setParameter('resolved', FindingStatus::Resolved->value)
+            ->setParameter('ok', FindingType::Ok->value)
             ->orderBy('f.checkedAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -104,7 +106,7 @@ class FindingRepository extends ServiceEntityRepository
             ->setParameter('domainId', $domainId)
             ->setParameter('findingType', $findingType)
             ->setParameter('currentRunId', $currentRunId)
-            ->setParameter('statuses', ['new', 'known'])
+            ->setParameter('statuses', [FindingStatus::New->value, FindingStatus::Known->value])
             ->getQuery()
             ->getSingleScalarResult();
 

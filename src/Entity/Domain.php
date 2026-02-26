@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\DomainStatus;
 use App\Repository\DomainRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -28,7 +29,7 @@ class Domain
     private ?string $description = null;
 
     #[ORM\Column(length: 20, options: ['default' => 'active'])]
-    private string $status = 'active';
+    private string $status = DomainStatus::Active->value;
 
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $createdAt = null;
@@ -111,12 +112,14 @@ class Domain
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return $this->status === DomainStatus::Active->value;
     }
 
     public function toggleStatus(): void
     {
-        $this->status = $this->status === 'active' ? 'inactive' : 'active';
+        $this->status = $this->status === DomainStatus::Active->value
+            ? DomainStatus::Inactive->value
+            : DomainStatus::Active->value;
     }
 
     public function getCreatedAt(): ?\DateTimeImmutable

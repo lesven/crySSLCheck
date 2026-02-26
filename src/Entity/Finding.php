@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use App\Enum\FindingStatus;
+use App\Enum\Severity;
 use App\Repository\FindingRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -37,7 +39,7 @@ class Finding
     private array $details = [];
 
     #[ORM\Column(length: 20, options: ['default' => 'new'])]
-    private string $status = 'new';
+    private string $status = FindingStatus::New->value;
 
     #[ORM\PrePersist]
     public function onPrePersist(): void
@@ -129,27 +131,27 @@ class Finding
 
     public function markResolved(): void
     {
-        $this->status = 'resolved';
+        $this->status = FindingStatus::Resolved->value;
     }
 
     public function getSeverityBadgeClass(): string
     {
         return match ($this->severity) {
-            'critical' => 'danger',
-            'high'     => 'warning',
-            'medium'   => 'info',
-            'low'      => 'secondary',
-            default    => 'success',
+            Severity::Critical->value => 'danger',
+            Severity::High->value     => 'warning',
+            Severity::Medium->value   => 'info',
+            Severity::Low->value      => 'secondary',
+            default                   => 'success',
         };
     }
 
     public function getStatusBadgeClass(): string
     {
         return match ($this->status) {
-            'new'      => 'danger',
-            'known'    => 'warning',
-            'resolved' => 'success',
-            default    => 'secondary',
+            FindingStatus::New->value      => 'danger',
+            FindingStatus::Known->value    => 'warning',
+            FindingStatus::Resolved->value => 'success',
+            default                        => 'secondary',
         };
     }
 }

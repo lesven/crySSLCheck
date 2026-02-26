@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Enum\ScanRunStatus;
 use App\Repository\FindingRepository;
 use App\Repository\ScanRunRepository;
 use App\Service\ScanService;
@@ -43,7 +44,7 @@ class ScanCommand extends Command
 
         if (!$force) {
             $todayRun = $this->scanRunRepository->findLatestSuccessfulToday();
-            if ($todayRun && $todayRun->getStatus() === 'success') {
+            if ($todayRun && $todayRun->getStatus() === ScanRunStatus::Success->value) {
                 $io->note("Scan für heute bereits erfolgreich durchgeführt (Run #{$todayRun->getId()}). Überspringe.");
                 $io->note('Verwende --force / -f um trotzdem zu scannen.');
                 return Command::SUCCESS;
@@ -94,9 +95,9 @@ class ScanCommand extends Command
             }
 
             return match ($scanRun->getStatus()) {
-                'success' => Command::SUCCESS,
-                'partial'  => Command::SUCCESS,
-                default    => Command::FAILURE,
+                ScanRunStatus::Success->value => Command::SUCCESS,
+                ScanRunStatus::Partial->value  => Command::SUCCESS,
+                default                        => Command::FAILURE,
             };
 
         } catch (\Throwable $e) {

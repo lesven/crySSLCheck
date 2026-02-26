@@ -24,13 +24,24 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    App\Service\ScanService:
+    App\ValueObject\ScanConfiguration:
         arguments:
             $scanTimeout: '%app.scan_timeout%'
             $retryDelay: '%app.retry_delay%'
             $retryCount: '%app.retry_count%'
             $notifyOnUnreachable: '%app.notify_on_unreachable%'
             $minRsaKeyBits: '%app.min_rsa_key_bits%'
+
+    App\Service\ScanService:
+        arguments:
+            $config: '@App\ValueObject\ScanConfiguration'
+
+    App\Service\FindingPersister:
+        arguments:
+            $config: '@App\ValueObject\ScanConfiguration'
+
+    App\Service\TlsConnectorInterface:
+        alias: App\Service\TlsConnector
 
     App\Service\MailService:
         public: true

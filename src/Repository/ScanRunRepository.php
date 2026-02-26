@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\ScanRun;
+use App\Enum\ScanRunStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -37,7 +38,7 @@ class ScanRunRepository extends ServiceEntityRepository
             ->andWhere('sr.status != :running')
             ->setParameter('today', $today)
             ->setParameter('tomorrow', $tomorrow)
-            ->setParameter('running', 'running')
+            ->setParameter('running', ScanRunStatus::Running->value)
             ->orderBy('sr.startedAt', 'DESC')
             ->setMaxResults(1)
             ->getQuery()

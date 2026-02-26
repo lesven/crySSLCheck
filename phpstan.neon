@@ -1,0 +1,13 @@
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    level: 6
+    paths:
+        - src
+    excludePaths:
+        - src/Kernel.php
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+    tmpDir: var/cache/phpstan
