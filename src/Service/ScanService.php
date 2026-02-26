@@ -24,6 +24,7 @@ class ScanService
         private readonly CertificateAnalyzer $certificateAnalyzer,
         private readonly TlsConnectorInterface $tlsConnector,
         private readonly FindingPersister $findingPersister,
+        private readonly ParallelScanner $parallelScanner,
         private readonly LoggerInterface $logger,
         private readonly ScanConfiguration $config = new ScanConfiguration(),
     ) {
@@ -49,30 +50,71 @@ class ScanService
         $hasErrors = false;
         $allFailed = true;
 
-        foreach ($domains as $domain) {
-            try {
-                $scanFindings = $this->scanDomain($domain);
-                $this->findingPersister->persistFindings($domain, $scanRun, $scanFindings);
+        if ($this->config->scanConcurrency > 1) {
+            // Parallel scan via subprocess workers
+            $scanResults = $this->parallelScanner->scan($domains);
 
-                $allFailed = false;
-                foreach ($scanFindings as $f) {
-                    if (in_array($f['finding_type'], [FindingType::Unreachable->value, FindingType::Error->value])) {
-                        $hasErrors = true;
-                    }
+            foreach ($scanResults as $result) {
+                $domain = $result['domain'];
+
+                if ($result['error'] !== null) {
+                    $this->logger->error("Fehler beim Scannen von {$domain->getFqdn()}:{$domain->getPort()}: " . $result['error']);
+                    $hasErrors = true;
+
+                    $finding = new Finding();
+                    $finding->setDomain($domain);
+                    $finding->setScanRun($scanRun);
+                    $finding->setFindingType(FindingType::Error->value);
+                    $finding->setSeverity(Severity::Low->value);
+                    $finding->setDetails(['error' => $result['error']]);
+                    $finding->setStatus(FindingStatus::New->value);
+                    $this->entityManager->persist($finding);
+                    $this->entityManager->flush();
+                    continue;
                 }
-            } catch (\Throwable $e) {
-                $this->logger->error("Fehler beim Scannen von {$domain->getFqdn()}:{$domain->getPort()}: " . $e->getMessage());
-                $hasErrors = true;
 
-                $finding = new Finding();
-                $finding->setDomain($domain);
-                $finding->setScanRun($scanRun);
-                $finding->setFindingType(FindingType::Error->value);
-                $finding->setSeverity(Severity::Low->value);
-                $finding->setDetails(['error' => $e->getMessage()]);
-                $finding->setStatus(FindingStatus::New->value);
-                $this->entityManager->persist($finding);
-                $this->entityManager->flush();
+                try {
+                    $scanFindings = $result['findings'];
+                    $this->findingPersister->persistFindings($domain, $scanRun, $scanFindings);
+
+                    $allFailed = false;
+                    foreach ($scanFindings as $f) {
+                        if (in_array($f['finding_type'], [FindingType::Unreachable->value, FindingType::Error->value])) {
+                            $hasErrors = true;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->error("Fehler beim Persistieren für {$domain->getFqdn()}:{$domain->getPort()}: " . $e->getMessage());
+                    $hasErrors = true;
+                }
+            }
+        } else {
+            // Sequential scan (concurrency = 1, original behavior)
+            foreach ($domains as $domain) {
+                try {
+                    $scanFindings = $this->scanDomain($domain);
+                    $this->findingPersister->persistFindings($domain, $scanRun, $scanFindings);
+
+                    $allFailed = false;
+                    foreach ($scanFindings as $f) {
+                        if (in_array($f['finding_type'], [FindingType::Unreachable->value, FindingType::Error->value])) {
+                            $hasErrors = true;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->error("Fehler beim Scannen von {$domain->getFqdn()}:{$domain->getPort()}: " . $e->getMessage());
+                    $hasErrors = true;
+
+                    $finding = new Finding();
+                    $finding->setDomain($domain);
+                    $finding->setScanRun($scanRun);
+                    $finding->setFindingType(FindingType::Error->value);
+                    $finding->setSeverity(Severity::Low->value);
+                    $finding->setDetails(['error' => $e->getMessage()]);
+                    $finding->setStatus(FindingStatus::New->value);
+                    $this->entityManager->persist($finding);
+                    $this->entityManager->flush();
+                }
             }
         }
 
@@ -116,9 +158,17 @@ class ScanService
      */
     public function scanDomain(Domain $domain): array
     {
-        $fqdn = $domain->getFqdn();
-        $port = $domain->getPort();
+        return $this->scanDomainByFqdn($domain->getFqdn(), $domain->getPort());
+    }
 
+    /**
+     * Scans a domain by FQDN and port without requiring a Domain entity.
+     * Used by ScanDomainCommand for parallel subprocess execution.
+     *
+     * @return array<array{finding_type: string, severity: string, details: array}>
+     */
+    public function scanDomainByFqdn(string $fqdn, int $port): array
+    {
         $result = $this->tlsConnector->connect($fqdn, $port, $this->config->scanTimeout);
 
         if ($result === null) {

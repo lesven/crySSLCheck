@@ -7,6 +7,7 @@ use App\Repository\DomainRepository;
 use App\Repository\ScanRunRepository;
 use App\Service\CertificateAnalyzer;
 use App\Service\FindingPersister;
+use App\Service\ParallelScanner;
 use App\Service\ScanService;
 use App\Service\TlsConnectorInterface;
 use App\ValueObject\ScanConfiguration;
@@ -41,6 +42,7 @@ class ScanServiceAnalysisTest extends TestCase
             certificateAnalyzer: new CertificateAnalyzer($config),
             tlsConnector: $this->createStub(TlsConnectorInterface::class),
             findingPersister: $this->createStub(FindingPersister::class),
+            parallelScanner: $this->createStub(ParallelScanner::class),
             logger: new NullLogger(),
             config: $config,
         );

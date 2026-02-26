@@ -14,6 +14,7 @@ final readonly class ScanConfiguration
         public int $retryCount = 1,
         public bool $notifyOnUnreachable = false,
         public int $minRsaKeyBits = 2048,
+        public int $scanConcurrency = 5,
     ) {
     }
 }

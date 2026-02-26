@@ -10,6 +10,7 @@
 | CertificateAnalyzer | ~130 LOC aus ScanService | `Service\CertificateAnalyzer` | 30+ |
 | TlsConnector | ~150 LOC aus ScanService | `Service\TlsConnector` + `TlsConnectorInterface` | 3 |
 | FindingPersister | ~60 LOC aus ScanService | `Service\FindingPersister` | 17 |
+| ParallelScanner | Neuer Service | `Service\ParallelScanner` | 8 |
 | Enums | String-Literale überall | 5 Enums in `Enum\` | – |
 
 ### ScanService-Reduktion
@@ -76,7 +77,8 @@ graph TD
     end
 
     subgraph Services
-        ScanService["ScanService<br/>(~150 LOC – Orchestrator)"]
+        ScanService["ScanService<br/>(~180 LOC – Orchestrator)"]
+        ParallelScanner["ParallelScanner<br/>(~170 LOC)"]
         CertificateAnalyzer["CertificateAnalyzer<br/>(~130 LOC)"]
         TlsConnector["TlsConnector<br/>(~150 LOC)"]
         FindingPersister["FindingPersister<br/>(~60 LOC)"]
@@ -123,6 +125,11 @@ graph TD
     ScanService --> CertificateAnalyzer
     ScanService --> TlsConnector
     ScanService --> FindingPersister
+    ScanService --> ParallelScanner
+
+    %% Parallel scanning
+    ParallelScanner --> ScanDomainCmd["ScanDomainCommand<br/>(subprocess)"]
+    ScanDomainCmd --> ScanService
 
     %% Extracted services
     TlsConnector --> StreamSocket
@@ -135,6 +142,7 @@ graph TD
     ScanConfig -.-> ScanService
     ScanConfig -.-> CertificateAnalyzer
     ScanConfig -.-> FindingPersister
+    ScanConfig -.-> ParallelScanner
 
     %% Controller dependencies
     DomainController --> DomainRepo
@@ -174,6 +182,8 @@ sequenceDiagram
     participant Cmd as ScanCommand
     participant SS as ScanService
     participant DR as DomainRepository
+    participant PS as ParallelScanner
+    participant SDC as ScanDomainCommand<br/>(Subprocess)
     participant TC as TlsConnector
     participant CA as CertificateAnalyzer
     participant FP as FindingPersister
@@ -185,21 +195,30 @@ sequenceDiagram
     SS->>DR: findActive()
     DR-->>SS: Domain[]
 
-    loop für jede Domain
-        SS->>TC: connect(fqdn, port, timeout)
-        alt Verbindung OK
-            TC-->>SS: certData array
+    alt SCAN_CONCURRENCY > 1
+        SS->>PS: scan(domains)
+        loop für jeden Chunk (Größe = SCAN_CONCURRENCY)
+            par parallele Subprozesse
+                PS->>SDC: app:scan-domain fqdn port
+                SDC->>SS: scanDomainByFqdn(fqdn, port)
+                SS->>TC: connect(fqdn, port, timeout)
+                TC-->>SS: certData / null
+                SS->>CA: analyze(certData)
+                CA-->>SS: findings[]
+                SDC-->>PS: JSON findings (stdout)
+            end
+        end
+        PS-->>SS: results[]
+    else SCAN_CONCURRENCY = 1
+        loop für jede Domain (sequentiell)
+            SS->>TC: connect(fqdn, port, timeout)
+            TC-->>SS: certData / null
             SS->>CA: analyze(certData)
             CA-->>SS: findings[]
-        else Cert-Fehler
-            TC->>TC: retry mit verify_peer=false
-            TC-->>SS: certData (unsicher)
-            SS->>CA: analyze(certData)
-            CA-->>SS: findings[] inkl. CHAIN_ERROR
-        else Timeout/Unreachable
-            SS-->>SS: UNREACHABLE Finding
         end
+    end
 
+    loop für jede Domain (sequentiell persistieren)
         SS->>FP: persistFindings(domain, scanRun, findings)
         FP->>FR: isKnownFinding()
         FR-->>FP: bool
