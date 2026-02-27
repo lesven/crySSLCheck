@@ -200,6 +200,55 @@ class FindingControllerTest extends WebTestCase
         $this->assertStringContainsString('page=2', $content);
     }
 
+    public function testSearchFiltersFindingsAndPreservesParameters(): void
+    {
+        $client = $this->buildClient();
+        $this->loginUser($client);
+
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+
+        $matchingDomain = new Domain();
+        $matchingDomain->setFqdn('search-example.com');
+        $matchingDomain->setPort(443);
+        $em->persist($matchingDomain);
+
+        $nonMatchingDomain = new Domain();
+        $nonMatchingDomain->setFqdn('other-domain.net');
+        $nonMatchingDomain->setPort(443);
+        $em->persist($nonMatchingDomain);
+
+        $scanRun = new ScanRun();
+        $scanRun->finish('success');
+        $em->persist($scanRun);
+
+        $matchingFinding = new Finding();
+        $matchingFinding->setDomain($matchingDomain);
+        $matchingFinding->setScanRun($scanRun);
+        $matchingFinding->setFindingType('CERT_EXPIRY');
+        $matchingFinding->setSeverity('high');
+        $matchingFinding->setStatus('new');
+        $matchingFinding->setDetails([]);
+        $em->persist($matchingFinding);
+
+        $otherFinding = new Finding();
+        $otherFinding->setDomain($nonMatchingDomain);
+        $otherFinding->setScanRun($scanRun);
+        $otherFinding->setFindingType('CERT_EXPIRY');
+        $otherFinding->setSeverity('high');
+        $otherFinding->setStatus('new');
+        $otherFinding->setDetails([]);
+        $em->persist($otherFinding);
+
+        $em->flush();
+
+        $client->request('GET', '/findings?search=example&current_run=1&problems_only=1');
+        $this->assertResponseIsSuccessful();
+
+        $content = $client->getResponse()->getContent();
+        $this->assertStringContainsString('search-example.com', $content);
+        $this->assertStringNotContainsString('other-domain.net', $content);
+    }
+
     public function testPaginationLinksPreserveCurrentRunFilter(): void
     {
         $client = $this->buildClient();

@@ -12,6 +12,18 @@
     <div class="card-body">
         <form method="GET" action="{{ path('finding_index') }}" class="row g-3 align-items-center">
             <div class="col-auto">
+                <label for="search" class="visually-hidden">Domain suchen</label>
+                <input
+                    class="form-control"
+                    type="text"
+                    id="search"
+                    name="search"
+                    maxlength="253"
+                    placeholder="Domain suchen"
+                    value="{{ search|default('')|e('html_attr') }}"
+                >
+            </div>
+            <div class="col-auto">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="current_run" name="current_run" value="1"
                            {{ currentRunOnly ? 'checked' : '' }} onchange="this.form.submit()">
@@ -26,7 +38,7 @@
                 </div>
             </div>
             <div class="col-auto">
-                <noscript><button type="submit" class="btn btn-sm btn-primary">Filter anwenden</button></noscript>
+                <button type="submit" class="btn btn-sm btn-primary">Suchen</button>
             </div>
         </form>
     </div>
@@ -34,7 +46,11 @@
 
 {% if findings is empty %}
     <div class="alert alert-info">
-        <i class="bi bi-info-circle"></i> Keine Findings vorhanden.
+        {% if search %}
+            <i class="bi bi-info-circle"></i> Keine Findings für „{{ search }}“ gefunden.
+        {% else %}
+            <i class="bi bi-info-circle"></i> Keine Findings vorhanden.
+        {% endif %}
     </div>
 {% else %}
     <div class="table-responsive">
@@ -109,19 +125,19 @@
         <nav>
             <ul class="pagination justify-content-center">
                 <li class="page-item {{ page <= 1 ? 'disabled' : '' }}">
-                    <a class="page-link" href="{{ path('finding_index', {page: page - 1, problems_only: problemsOnly ? 1 : 0, current_run: currentRunOnly ? 1 : 0}) }}">
+                    <a class="page-link" href="{{ path('finding_index', {page: page - 1, problems_only: problemsOnly ? 1 : 0, current_run: currentRunOnly ? 1 : 0, search: search}) }}">
                         &laquo; Zurück
                     </a>
                 </li>
                 {% for i in 1..totalPages %}
                     <li class="page-item {{ i == page ? 'active' : '' }}">
-                        <a class="page-link" href="{{ path('finding_index', {page: i, problems_only: problemsOnly ? 1 : 0, current_run: currentRunOnly ? 1 : 0}) }}">
+                        <a class="page-link" href="{{ path('finding_index', {page: i, problems_only: problemsOnly ? 1 : 0, current_run: currentRunOnly ? 1 : 0, search: search}) }}">
                             {{ i }}
                         </a>
                     </li>
                 {% endfor %}
                 <li class="page-item {{ page >= totalPages ? 'disabled' : '' }}">
-                    <a class="page-link" href="{{ path('finding_index', {page: page + 1, problems_only: problemsOnly ? 1 : 0, current_run: currentRunOnly ? 1 : 0}) }}">
+                    <a class="page-link" href="{{ path('finding_index', {page: page + 1, problems_only: problemsOnly ? 1 : 0, current_run: currentRunOnly ? 1 : 0, search: search}) }}">
                         Weiter &raquo;
                     </a>
                 </li>
