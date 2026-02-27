@@ -45,6 +45,11 @@ class Domain
         $this->findings = new ArrayCollection();
     }
 
+    public function __toString(): string
+    {
+        return $this->fqdn . ':' . $this->port;
+    }
+
     #[ORM\PrePersist]
     public function onPrePersist(): void
     {
@@ -138,10 +143,5 @@ class Domain
     public function getFindings(): Collection
     {
         return $this->findings;
-    }
-
-    public function __toString(): string
-    {
-        return $this->fqdn . ':' . $this->port;
     }
 }
