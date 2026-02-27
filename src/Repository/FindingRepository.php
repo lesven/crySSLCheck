@@ -21,7 +21,7 @@ class FindingRepository extends ServiceEntityRepository
     /**
      * @return Finding[]
      */
-    public function findPaginated(int $limit, int $offset, bool $problemsOnly = false, ?int $runId = null): array
+    public function findPaginated(int $limit, int $offset, bool $problemsOnly = false, ?int $runId = null, ?string $search = null): array
     {
         $qb = $this->createQueryBuilder('f')
             ->join('f.domain', 'd')
@@ -39,13 +39,20 @@ class FindingRepository extends ServiceEntityRepository
                ->setParameter('runId', $runId);
         }
 
+        if ($search !== null && $search !== '') {
+            $escapedSearch = strtr($search, ['!' => '!!', '%' => '!%', '_' => '!_']);
+            $qb->andWhere("d.fqdn LIKE :search ESCAPE '!'")
+               ->setParameter('search', '%' . $escapedSearch . '%');
+        }
+
         return $qb->getQuery()->getResult();
     }
 
-    public function countFiltered(bool $problemsOnly = false, ?int $runId = null): int
+    public function countFiltered(bool $problemsOnly = false, ?int $runId = null, ?string $search = null): int
     {
         $qb = $this->createQueryBuilder('f')
-            ->select('COUNT(f.id)');
+            ->select('COUNT(f.id)')
+            ->join('f.domain', 'd');
 
         if ($problemsOnly) {
             $qb->andWhere('f.findingType != :ok')
@@ -55,6 +62,12 @@ class FindingRepository extends ServiceEntityRepository
         if ($runId !== null) {
             $qb->andWhere('f.scanRun = :runId')
                ->setParameter('runId', $runId);
+        }
+
+        if ($search !== null && $search !== '') {
+            $escapedSearch = strtr($search, ['!' => '!!', '%' => '!%', '_' => '!_']);
+            $qb->andWhere("d.fqdn LIKE :search ESCAPE '!'")
+               ->setParameter('search', '%' . $escapedSearch . '%');
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult();
