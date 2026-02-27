@@ -265,4 +265,52 @@ class DomainRepositoryTest extends IntegrationTestCase
         $this->assertCount(1, $result);
         $this->assertSame('a.example.com', $result[0]->getFqdn());
     }
+
+
+    // ── countFiltered / findPaginatedFiltered ────────────────────────────────
+
+    public function testCountFilteredReturnsAllWhenNoSearch(): void
+    {
+        $this->createDomain('alpha.example.com');
+        $this->createDomain('beta.example.com');
+        $this->em->flush();
+
+        $this->assertSame(2, $this->repository->countFiltered(null));
+    }
+
+    public function testCountFilteredFiltersCorrectly(): void
+    {
+        $this->createDomain('alpha.example.com');
+        $this->createDomain('beta.example.com');
+        $this->createDomain('alpha-test.example.com');
+        $this->em->flush();
+
+        $this->assertSame(2, $this->repository->countFiltered('alpha'));
+    }
+
+    public function testFindPaginatedFilteredReturnsMatchingDomains(): void
+    {
+        $this->createDomain('api.example.com');
+        $this->createDomain('mail.example.com');
+        $this->createDomain('api.internal.example.com');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginatedFiltered(1, 10, 'api');
+
+        $this->assertCount(2, $result);
+        $this->assertSame('api.example.com', $result[0]->getFqdn());
+        $this->assertSame('api.internal.example.com', $result[1]->getFqdn());
+    }
+
+    public function testFindPaginatedFilteredIsCaseInsensitive(): void
+    {
+        $this->createDomain('MiXeD.Example.com');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginatedFiltered(1, 10, 'mixed');
+
+        $this->assertCount(1, $result);
+        $this->assertSame('MiXeD.Example.com', $result[0]->getFqdn());
+    }
+
 }

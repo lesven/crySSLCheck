@@ -37,12 +37,20 @@ class DomainController extends AbstractController
         $session->remove('scan_results');
         $session->remove('mailer_debug');
 
-        $totalCount = $this->domainRepository->countAll();
+        $search = trim((string) $request->query->get('search', ''));
+        $search = mb_substr($search, 0, 255);
+        $search = $search === '' ? null : $search;
+
+        $totalCount = $this->domainRepository->countFiltered($search);
         $totalPages = $totalCount > 0 ? (int) ceil($totalCount / $this->domainsPerPage) : 1;
-        $page       = max(1, min($totalPages, (int) $request->query->get('page', 1)));
+        $page       = max(1, (int) $request->query->get('page', 1));
+
+        if ($totalPages < $page) {
+            $page = max(1, $totalPages);
+        }
 
         return $this->render('domain/index.html.twig', [
-            'domains'           => $this->domainRepository->findPaginated($page, $this->domainsPerPage),
+            'domains'           => $this->domainRepository->findPaginatedFiltered($page, $this->domainsPerPage, $search),
             'scan_results'      => $scanResults,
             'mailer_debug'      => $mailerDebug,
             'mailer_configured' => $this->mailService->isConfigured(),
@@ -51,6 +59,7 @@ class DomainController extends AbstractController
             'total_pages'       => $totalPages,
             'total_count'       => $totalCount,
             'domains_per_page'  => $this->domainsPerPage,
+            'search'            => $search,
         ]);
     }
 

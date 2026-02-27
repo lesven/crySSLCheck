@@ -531,4 +531,82 @@ class DomainControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertSelectorTextContains('body', '6 Domains gesamt');
     }
+
+
+    public function testIndexWithSearchReturnsFilteredResults(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        $this->createTestDomain('alpha.example.com');
+        $this->createTestDomain('beta.example.com');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains?search=alpha');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'alpha.example.com');
+        $this->assertStringNotContainsString('beta.example.com', (string) $client->getResponse()->getContent());
+        $this->assertSelectorTextContains('body', '1 Ergebnis');
+    }
+
+    public function testIndexWithEmptySearchBehavesLikeNoFilter(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        $this->createTestDomain('alpha.example.com');
+        $this->createTestDomain('beta.example.com');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains?search=');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'alpha.example.com');
+        $this->assertSelectorTextContains('body', 'beta.example.com');
+    }
+
+    public function testSearchTermIsPreservedOnPagination(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        foreach (range(1, 6) as $i) {
+            $this->createTestDomain(sprintf('app%02d.example.com', $i));
+        }
+        $this->createTestDomain('other.example.com');
+
+        $client->loginUser($user);
+        $crawler = $client->request('GET', '/domains?search=app');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('nav[aria-label="Domain-Seitennavigation"]');
+
+        $nextLink = $crawler->filter('nav[aria-label="Domain-Seitennavigation"] a[aria-label="Vor"]')->attr('href');
+        $this->assertStringContainsString('search=app', (string) $nextLink);
+
+        $client->request('GET', '/domains?search=app&page=2');
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'app06.example.com');
+    }
+
+    public function testResetSearchReturnsFullList(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        $this->createTestDomain('alpha.example.com');
+        $this->createTestDomain('beta.example.com');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains?search=alpha');
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('beta.example.com', (string) $client->getResponse()->getContent());
+
+        $client->request('GET', '/domains');
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'alpha.example.com');
+        $this->assertSelectorTextContains('body', 'beta.example.com');
+    }
+
 }
