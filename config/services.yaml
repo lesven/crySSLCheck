@@ -9,6 +9,7 @@ parameters:
     app.min_rsa_key_bits: '%env(int:MIN_RSA_KEY_BITS)%'
     app.scan_concurrency: '%env(int:SCAN_CONCURRENCY)%'
     app.allow_ip_addresses: '%env(bool:ALLOW_IP_ADDRESSES)%'
+    app.domains_per_page: '%env(int:DOMAINS_PER_PAGE)%'
     app.mailer_from_email: '%env(MAILER_FROM_EMAIL)%'
     app.mailer_from_name: '%env(MAILER_FROM_NAME)%'
     app.alert_recipients: '%env(csv:ALERT_RECIPIENTS)%'
@@ -57,6 +58,10 @@ services:
             $fromEmail: '%app.mailer_from_email%'
             $fromName: '%app.mailer_from_name%'
             $alertRecipients: '%app.alert_recipients%'
+
+    App\Controller\DomainController:
+        arguments:
+            $domainsPerPage: '%app.domains_per_page%'
 
 
     App\Service\ValidationService:

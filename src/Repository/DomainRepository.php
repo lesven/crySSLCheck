@@ -29,6 +29,31 @@ class DomainRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function countAll(): int
+    {
+        return (int) $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * @return Domain[]
+     */
+    public function findPaginated(int $page, int $perPage): array
+    {
+        $page    = max(1, $page);
+        $perPage = max(1, $perPage);
+
+        return $this->createQueryBuilder('d')
+            ->orderBy('d.fqdn', 'ASC')
+            ->addOrderBy('d.port', 'ASC')
+            ->setFirstResult(($page - 1) * $perPage)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getResult();
+    }
+
     /**
      * @return Domain[]
      */

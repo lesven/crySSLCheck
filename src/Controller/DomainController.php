@@ -23,6 +23,7 @@ class DomainController extends AbstractController
         private readonly DomainRepository $domainRepository,
         private readonly ValidationService $validationService,
         private readonly MailService $mailService,
+        private readonly int $domainsPerPage = 25,
     ) {
     }
 
@@ -36,12 +37,20 @@ class DomainController extends AbstractController
         $session->remove('scan_results');
         $session->remove('mailer_debug');
 
+        $totalCount = $this->domainRepository->countAll();
+        $totalPages = $totalCount > 0 ? (int) ceil($totalCount / $this->domainsPerPage) : 1;
+        $page       = max(1, min($totalPages, (int) $request->query->get('page', 1)));
+
         return $this->render('domain/index.html.twig', [
-            'domains'           => $this->domainRepository->findAllOrderedByFqdn(),
+            'domains'           => $this->domainRepository->findPaginated($page, $this->domainsPerPage),
             'scan_results'      => $scanResults,
             'mailer_debug'      => $mailerDebug,
             'mailer_configured' => $this->mailService->isConfigured(),
             'alert_recipients'  => implode(', ', $this->mailService->getAlertRecipients()),
+            'current_page'      => $page,
+            'total_pages'       => $totalPages,
+            'total_count'       => $totalCount,
+            'domains_per_page'  => $this->domainsPerPage,
         ]);
     }
 
