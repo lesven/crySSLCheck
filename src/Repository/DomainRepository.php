@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Domain;
 use App\Enum\DomainStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -37,6 +38,16 @@ class DomainRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    public function countFiltered(?string $search): int
+    {
+        $qb = $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)');
+
+        $this->applySearchFilter($qb, $search);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
     /**
      * @return Domain[]
      */
@@ -52,6 +63,25 @@ class DomainRepository extends ServiceEntityRepository
             ->setMaxResults($perPage)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * @return array<int, Domain>
+     */
+    public function findPaginatedFiltered(int $page, int $perPage, ?string $search): array
+    {
+        $page    = max(1, $page);
+        $perPage = max(1, $perPage);
+
+        $qb = $this->createQueryBuilder('d')
+            ->orderBy('d.fqdn', 'ASC')
+            ->addOrderBy('d.port', 'ASC')
+            ->setFirstResult(($page - 1) * $perPage)
+            ->setMaxResults($perPage);
+
+        $this->applySearchFilter($qb, $search);
+
+        return $qb->getQuery()->getResult();
     }
 
     /**
@@ -83,5 +113,15 @@ class DomainRepository extends ServiceEntityRepository
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    private function applySearchFilter(QueryBuilder $qb, ?string $search): void
+    {
+        if ($search === null) {
+            return;
+        }
+
+        $qb->andWhere('LOWER(d.fqdn) LIKE LOWER(:search)')
+            ->setParameter('search', '%' . $search . '%');
     }
 }
