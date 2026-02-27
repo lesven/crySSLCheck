@@ -178,6 +178,83 @@ class FindingRepositoryTest extends IntegrationTestCase
         $this->assertSame(1, $this->repository->countFiltered(runId: $scanRun2->getId()));
     }
 
+    public function testFindPaginatedFiltersByDomainSearchSubstring(): void
+    {
+        $scanRun = $this->createScanRun();
+        $matchingDomain = $this->createDomain('mail.example.com');
+        $otherDomain = $this->createDomain('internal.local');
+        $this->createFinding($matchingDomain, $scanRun, 'CERT_EXPIRY');
+        $this->createFinding($otherDomain, $scanRun, 'TLS_VERSION');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginated(10, 0, search: 'example');
+
+        $this->assertCount(1, $result);
+        $this->assertSame('mail.example.com', $result[0]->getDomain()->getFqdn());
+    }
+
+    public function testFindPaginatedReturnsNoResultWhenSearchDoesNotMatch(): void
+    {
+        $scanRun = $this->createScanRun();
+        $domain = $this->createDomain('mail.example.com');
+        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginated(10, 0, search: 'nomatch');
+
+        $this->assertSame([], $result);
+    }
+
+    public function testCountFilteredTreatsEmptySearchLikeNoSearch(): void
+    {
+        $domain = $this->createDomain('mail.example.com');
+        $scanRun = $this->createScanRun();
+        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY');
+        $this->em->flush();
+
+        $all = $this->repository->countFiltered();
+        $withEmptySearch = $this->repository->countFiltered(search: '');
+
+        $this->assertSame($all, $withEmptySearch);
+    }
+
+    public function testSearchEscapesLikeWildcardsPercentAndUnderscore(): void
+    {
+        $scanRun = $this->createScanRun();
+        $wildcardDomain = $this->createDomain('a%b_c.example.com');
+        $otherDomain = $this->createDomain('axbzc.example.com');
+        $this->createFinding($wildcardDomain, $scanRun, 'CERT_EXPIRY');
+        $this->createFinding($otherDomain, $scanRun, 'TLS_VERSION');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginated(10, 0, search: '%b_');
+
+        $this->assertCount(1, $result);
+        $this->assertSame('a%b_c.example.com', $result[0]->getDomain()->getFqdn());
+    }
+
+    public function testCountFilteredSupportsSearchProblemsOnlyAndRunIdCombination(): void
+    {
+        $targetDomain = $this->createDomain('filter-example.com');
+        $otherDomain = $this->createDomain('other.com');
+        $scanRun1 = $this->createScanRun();
+        $scanRun2 = $this->createScanRun();
+
+        $this->createFinding($targetDomain, $scanRun1, 'CERT_EXPIRY', 'high');
+        $this->createFinding($targetDomain, $scanRun1, 'OK', 'ok');
+        $this->createFinding($targetDomain, $scanRun2, 'TLS_VERSION', 'high');
+        $this->createFinding($otherDomain, $scanRun1, 'CHAIN_ERROR', 'critical');
+        $this->em->flush();
+
+        $count = $this->repository->countFiltered(
+            problemsOnly: true,
+            runId: $scanRun1->getId(),
+            search: 'filter',
+        );
+
+        $this->assertSame(1, $count);
+    }
+
     // ── isKnownFinding ────────────────────────────────────────────────────────
 
     public function testIsKnownFindingReturnsFalseWhenNoPreviousFindings(): void
