@@ -357,4 +357,79 @@ class FindingRepositoryTest extends IntegrationTestCase
         $this->assertCount(1, $result);
         $this->assertSame('CERT_EXPIRY', $result[0]->getFindingType());
     }
+
+    // ── Pagination consistency: countFiltered vs. findPaginated ─────────────
+    // Regression tests for the pagination bug where countFiltered and
+    // findPaginated returned different counts with active filters.
+
+    public function testCountFilteredMatchesFindPaginatedWithProblemsOnlyFilter(): void
+    {
+        $domain  = $this->createDomain();
+        $scanRun = $this->createScanRun();
+        $this->createFinding($domain, $scanRun, 'OK', 'ok');
+        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY', 'high');
+        $this->createFinding($domain, $scanRun, 'TLS_VERSION', 'medium');
+        $this->em->flush();
+
+        $count   = $this->repository->countFiltered(problemsOnly: true);
+        $results = $this->repository->findPaginated(100, 0, problemsOnly: true);
+
+        $this->assertSame(count($results), $count, 'countFiltered muss mit Anzahl der findPaginated-Ergebnisse übereinstimmen');
+        $this->assertSame(2, $count);
+    }
+
+    public function testCountFilteredMatchesFindPaginatedWithRunIdFilter(): void
+    {
+        $domain   = $this->createDomain();
+        $scanRun1 = $this->createScanRun();
+        $scanRun2 = $this->createScanRun();
+        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY', 'high');
+        $this->createFinding($domain, $scanRun1, 'TLS_VERSION', 'medium');
+        $this->createFinding($domain, $scanRun2, 'OK', 'ok');
+        $this->em->flush();
+
+        $runId   = $scanRun1->getId();
+        $count   = $this->repository->countFiltered(runId: $runId);
+        $results = $this->repository->findPaginated(100, 0, runId: $runId);
+
+        $this->assertSame(count($results), $count, 'countFiltered muss mit findPaginated übereinstimmen bei runId-Filter');
+        $this->assertSame(2, $count);
+    }
+
+    public function testCountFilteredMatchesFindPaginatedWithBothFilters(): void
+    {
+        $domain   = $this->createDomain();
+        $scanRun1 = $this->createScanRun();
+        $scanRun2 = $this->createScanRun();
+        // Run 1: 1x OK + 2x Problem
+        $this->createFinding($domain, $scanRun1, 'OK', 'ok');
+        $this->createFinding($domain, $scanRun1, 'CERT_EXPIRY', 'high');
+        $this->createFinding($domain, $scanRun1, 'TLS_VERSION', 'medium');
+        // Run 2: 1x Problem (darf nicht gezählt werden)
+        $this->createFinding($domain, $scanRun2, 'CHAIN_ERROR', 'critical');
+        $this->em->flush();
+
+        $runId   = $scanRun1->getId();
+        $count   = $this->repository->countFiltered(problemsOnly: true, runId: $runId);
+        $results = $this->repository->findPaginated(100, 0, problemsOnly: true, runId: $runId);
+
+        $this->assertSame(count($results), $count, 'countFiltered muss mit findPaginated bei kombinierten Filtern übereinstimmen');
+        $this->assertSame(2, $count);
+    }
+
+    public function testOffsetBeyondTotalCountReturnsEmptyButCountIsNonZero(): void
+    {
+        // Reproduziert den Pagination-Bug: Offset > Gesamtergebnis → leere Seite trotz Daten
+        $domain  = $this->createDomain();
+        $scanRun = $this->createScanRun();
+        $this->createFinding($domain, $scanRun, 'CERT_EXPIRY', 'high');
+        $this->em->flush();
+
+        $count   = $this->repository->countFiltered(problemsOnly: true);
+        $results = $this->repository->findPaginated(50, 100, problemsOnly: true); // offset=100, totalCount=1
+
+        $this->assertSame(1, $count, 'countFiltered muss 1 zurückgeben');
+        $this->assertSame([], $results, 'findPaginated mit Offset > Count liefert leeres Array');
+        // Der Controller muss page clampen, damit dieser Fall nie aufgerufen wird
+    }
 }
