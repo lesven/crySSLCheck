@@ -160,6 +160,20 @@ class UserTest extends TestCase
         $this->assertContains($expectedRoleString, $roles);
     }
 
+
+    public function testNotifyAlertsDefaultsToFalse(): void
+    {
+        $user = new User();
+        $this->assertFalse($user->isNotifyAlerts());
+    }
+
+    public function testSetAndGetNotifyAlerts(): void
+    {
+        $user = new User();
+        $user->setNotifyAlerts(true);
+
+        $this->assertTrue($user->isNotifyAlerts());
+    }
     public static function roleTestCaseProvider(): array
     {
         return [

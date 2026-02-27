@@ -28,8 +28,11 @@ class UserController extends AbstractController
     #[Route('', name: 'user_index')]
     public function index(): Response
     {
+        $alertRecipients = $this->userRepository->findAlertRecipients();
+
         return $this->render('user/index.html.twig', [
             'users' => $this->userRepository->findAll(),
+            'alert_recipients_count' => count($alertRecipients),
         ]);
     }
 
@@ -40,6 +43,7 @@ class UserController extends AbstractController
         $username = '';
         $role = 'auditor';
         $email = '';
+        $notifyAlerts = false;
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('user_new', $request->request->get('_token'))) {
@@ -49,6 +53,7 @@ class UserController extends AbstractController
                 $password = $request->request->get('password', '');
                 $role     = $request->request->get('role', 'auditor');
                 $email    = trim($request->request->get('email', ''));
+                $notifyAlerts = $request->request->getBoolean('notify_alerts');
 
                 if ($username === '') {
                     $errors[] = 'Benutzername darf nicht leer sein.';
@@ -67,6 +72,10 @@ class UserController extends AbstractController
                     $errors[] = 'Diese E-Mail-Adresse ist bereits vergeben.';
                 }
 
+                if ($notifyAlerts && !$this->validationService->isValidAlertEmail($email)) {
+                    $errors[] = 'Alert-E-Mails können nur mit gültiger E-Mail-Adresse (nicht example@example.com) aktiviert werden.';
+                }
+
                 $passwordErrors = $this->validationService->validatePasswordStrength($password);
                 $errors = array_merge($errors, $passwordErrors);
 
@@ -75,6 +84,7 @@ class UserController extends AbstractController
                     $user->setUsername($username);
                     $user->setRole($role);
                     $user->setEmail($email);
+                    $user->setNotifyAlerts($notifyAlerts);
                     $user->setPassword($this->passwordHasher->hashPassword($user, $password));
                     $this->entityManager->persist($user);
                     $this->entityManager->flush();
@@ -90,10 +100,11 @@ class UserController extends AbstractController
             'username' => $username,
             'role'     => $role,
             'email'    => $email,
+            'notify_alerts' => $notifyAlerts,
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'user_edit', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
+    #[Route('/{id}/edit', name: 'user_edit', requirements: ['id' => '\\d+'], methods: ['GET', 'POST'])]
     public function edit(int $id, Request $request): Response
     {
         $user = $this->userRepository->find($id);
@@ -105,6 +116,7 @@ class UserController extends AbstractController
         $username = $user->getUsername();
         $role = $user->getRole();
         $email = $user->getEmail();
+        $notifyAlerts = $user->isNotifyAlerts();
 
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('user_edit_' . $id, $request->request->get('_token'))) {
@@ -114,6 +126,7 @@ class UserController extends AbstractController
                 $password = $request->request->get('password', '');
                 $role     = $request->request->get('role', 'auditor');
                 $email    = trim($request->request->get('email', ''));
+                $notifyAlerts = $request->request->getBoolean('notify_alerts');
 
                 if ($username === '') {
                     $errors[] = 'Benutzername darf nicht leer sein.';
@@ -139,6 +152,10 @@ class UserController extends AbstractController
                     $errors[] = 'Diese E-Mail-Adresse ist bereits vergeben.';
                 }
 
+                if ($notifyAlerts && !$this->validationService->isValidAlertEmail($email)) {
+                    $errors[] = 'Alert-E-Mails können nur mit gültiger E-Mail-Adresse (nicht example@example.com) aktiviert werden.';
+                }
+
                 if ($password !== '') {
                     $passwordErrors = $this->validationService->validatePasswordStrength($password);
                     $errors = array_merge($errors, $passwordErrors);
@@ -148,6 +165,7 @@ class UserController extends AbstractController
                     $user->setUsername($username);
                     $user->setRole($role);
                     $user->setEmail($email);
+                    $user->setNotifyAlerts($notifyAlerts);
                     if ($password !== '') {
                         $user->setPassword($this->passwordHasher->hashPassword($user, $password));
                     }
@@ -165,10 +183,11 @@ class UserController extends AbstractController
             'username' => $username,
             'role'     => $role,
             'email'    => $email,
+            'notify_alerts' => $notifyAlerts,
         ]);
     }
 
-    #[Route('/{id}/delete', name: 'user_delete', requirements: ['id' => '\d+'], methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'user_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function delete(int $id, Request $request): Response
     {
         $user = $this->userRepository->find($id);

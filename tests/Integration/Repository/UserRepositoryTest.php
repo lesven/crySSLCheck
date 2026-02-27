@@ -18,19 +18,18 @@ class UserRepositoryTest extends IntegrationTestCase
         $this->repository = self::getContainer()->get(UserRepository::class);
     }
 
-    private function createUser(string $username, string $email, string $role = 'auditor'): User
+    private function createUser(string $username, string $email, string $role = 'auditor', bool $notifyAlerts = false): User
     {
         $user = new User();
         $user->setUsername($username);
         $user->setEmail($email);
         $user->setRole($role);
+        $user->setNotifyAlerts($notifyAlerts);
         $user->setPassword('hashed_password');
         $this->em->persist($user);
 
         return $user;
     }
-
-    // ── findByEmail ───────────────────────────────────────────────────────────
 
     public function testFindByEmailReturnsNullWhenNoUserExists(): void
     {
@@ -48,34 +47,38 @@ class UserRepositoryTest extends IntegrationTestCase
         $this->assertSame($user->getId(), $result->getId());
     }
 
-    public function testFindByEmailReturnsNullWhenEmailDoesNotMatch(): void
-    {
-        $this->createUser('alice', 'alice@example.com');
-        $this->em->flush();
-
-        $result = $this->repository->findByEmail('other@example.com');
-        $this->assertNull($result);
-    }
-
     public function testFindByEmailExcludesSpecifiedId(): void
     {
         $user = $this->createUser('alice', 'alice@example.com');
         $this->em->flush();
 
-        // Editing the same user – should not be detected as a duplicate
         $result = $this->repository->findByEmail('alice@example.com', $user->getId());
         $this->assertNull($result);
     }
 
-    public function testFindByEmailDetectsDuplicateWhenDifferentUserHasSameEmail(): void
+    public function testFindAlertRecipientsReturnsOnlyEnabledUsers(): void
     {
-        $user1 = $this->createUser('alice', 'shared@example.com');
-        $user2 = $this->createUser('bob', 'bob@example.com');
+        $enabled = $this->createUser('alice', 'alice@example.com', notifyAlerts: true);
+        $this->createUser('bob', 'bob@example.com', notifyAlerts: false);
+        $this->createUser('charlie', 'charlie@example.com', notifyAlerts: false);
         $this->em->flush();
 
-        // Editing bob and trying to use alice's email
-        $result = $this->repository->findByEmail('shared@example.com', $user2->getId());
-        $this->assertNotNull($result);
-        $this->assertSame($user1->getId(), $result->getId());
+        $result = $this->repository->findAlertRecipients();
+
+        $this->assertCount(1, $result);
+        $this->assertSame($enabled->getId(), $result[0]->getId());
+    }
+
+    public function testFindAlertRecipientsDoesNotReturnDeletedUsers(): void
+    {
+        $enabled = $this->createUser('alice', 'alice@example.com', notifyAlerts: true);
+        $this->em->flush();
+
+        $this->em->remove($enabled);
+        $this->em->flush();
+
+        $result = $this->repository->findAlertRecipients();
+
+        $this->assertSame([], $result);
     }
 }

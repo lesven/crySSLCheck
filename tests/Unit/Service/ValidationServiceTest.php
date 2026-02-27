@@ -294,4 +294,19 @@ class ValidationServiceTest extends TestCase
         }
         $this->assertCount(10, array_unique($passwords), 'Generated passwords should be unique');
     }
+
+    public function testIsValidAlertEmailAcceptsValidAddress(): void
+    {
+        $this->assertTrue($this->service->isValidAlertEmail('alerts@example.org'));
+    }
+
+    public function testIsValidAlertEmailRejectsExamplePlaceholder(): void
+    {
+        $this->assertFalse($this->service->isValidAlertEmail('example@example.com'));
+    }
+
+    public function testIsValidAlertEmailRejectsInvalidFormat(): void
+    {
+        $this->assertFalse($this->service->isValidAlertEmail('invalid-email'));
+    }
 }

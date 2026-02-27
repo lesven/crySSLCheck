@@ -10,6 +10,18 @@
     </a>
 </div>
 
+{% if alert_recipients_count > 0 %}
+    <div class="alert alert-success">
+        <i class="bi bi-envelope-check"></i>
+        Empfänger aus Datenbank aktiv ({{ alert_recipients_count }} Empfänger)
+    </div>
+{% else %}
+    <div class="alert alert-warning">
+        <i class="bi bi-envelope-exclamation"></i>
+        Fallback aktiv: Empfänger aus ALERT_RECIPIENTS (.env)
+    </div>
+{% endif %}
+
 {% if users is empty %}
     <div class="alert alert-info">
         <i class="bi bi-info-circle"></i> Noch keine Benutzer vorhanden.
@@ -22,6 +34,7 @@
                     <th>Benutzername</th>
                     <th>E-Mail</th>
                     <th>Rolle</th>
+                    <th>Alerts</th>
                     <th>Aktionen</th>
                 </tr>
             </thead>
@@ -33,6 +46,11 @@
                         <td>
                             <span class="badge bg-{{ user.role == 'admin' ? 'primary' : 'secondary' }}">
                                 {{ user.role }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ user.notifyAlerts ? 'success' : 'secondary' }}">
+                                {{ user.notifyAlerts ? 'aktiv' : 'inaktiv' }}
                             </span>
                         </td>
                         <td>

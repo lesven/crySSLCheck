@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Domain;
 use App\Entity\Finding;
+use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
@@ -15,19 +16,23 @@ class MailService
         private readonly LoggerInterface $logger,
         private readonly string $fromEmail,
         private readonly string $fromName,
+        private readonly UserRepository $userRepository,
+        /** @var list<string> */
         private readonly array $alertRecipients,
+        private readonly ValidationService $validationService,
         private readonly ?\Symfony\Component\HttpFoundation\Session\SessionInterface $session = null,
     ) {
     }
 
     public function isConfigured(): bool
     {
-        return !empty($this->alertRecipients) && !empty($this->fromEmail);
+        return !empty($this->resolveRecipients()) && !empty($this->fromEmail);
     }
 
+    /** @return list<string> */
     public function getAlertRecipients(): array
     {
-        return $this->alertRecipients;
+        return $this->resolveRecipients();
     }
 
     /**
@@ -43,7 +48,7 @@ class MailService
         if (empty($this->fromEmail)) {
             $errors[] = 'Absenderadresse fehlt';
         }
-        if (empty($this->alertRecipients)) {
+        if (empty($this->resolveRecipients())) {
             $errors[] = 'Empfängerliste leer';
         }
 
@@ -52,7 +57,8 @@ class MailService
 
     public function sendFindingAlert(Domain $domain, Finding $finding): bool
     {
-        if (empty($this->alertRecipients)) {
+        $recipients = $this->resolveRecipients();
+        if (empty($recipients)) {
             $this->logger->info('SMTP: Keine Empfänger konfiguriert – E-Mail wird nicht gesendet.');
             return false;
         }
@@ -85,12 +91,12 @@ class MailService
 
         $body .= "\nDetails:\n{$detailsText}\n";
 
-        $success = $this->send($this->alertRecipients, $subject, $body);
+        $success = $this->send($recipients, $subject, $body);
         if (!$success) {
             $this->logger->warning('SMTP: Alarm-Mail konnte nicht gesendet werden', [
                 'domain' => $domain->getFqdn(),
                 'port' => $domain->getPort(),
-                'recipients' => $this->alertRecipients,
+                'recipients' => $recipients,
                 'subject' => $subject,
                 'config_errors' => $this->getConfigurationErrors(),
             ]);
@@ -104,7 +110,7 @@ class MailService
      */
     public function recordSkipped(string $subject, string $reason): void
     {
-        $this->logToSession($this->alertRecipients, $subject, false, 'nicht gesendet: ' . $reason);
+        $this->logToSession($this->resolveRecipients(), $subject, false, 'nicht gesendet: ' . $reason);
     }
 
     public function sendTestMail(string $recipient): bool
@@ -130,6 +136,33 @@ class MailService
         );
     }
 
+    /** @return list<string> */
+    private function resolveRecipients(): array
+    {
+        $dbRecipients = [];
+        foreach ($this->userRepository->findAlertRecipients() as $user) {
+            $email = trim($user->getEmail());
+            if ($this->validationService->isValidAlertEmail($email)) {
+                $dbRecipients[] = $email;
+            }
+        }
+
+        if (!empty($dbRecipients)) {
+            return array_values(array_unique($dbRecipients));
+        }
+
+        $fallbackRecipients = [];
+        foreach ($this->alertRecipients as $recipient) {
+            $email = trim($recipient);
+            if ($this->validationService->isValidAlertEmail($email)) {
+                $fallbackRecipients[] = $email;
+            }
+        }
+
+        return array_values(array_unique($fallbackRecipients));
+    }
+
+    /** @param list<string> $recipients */
     private function send(array $recipients, string $subject, string $body): bool
     {
         $this->logger->debug('SMTP: sende E-Mail', [
@@ -164,6 +197,8 @@ class MailService
     /**
      * Builds an Email object from the given recipients, subject, and body.
      * Only non-empty trimmed recipients are added as To-addresses.
+     *
+     * @param list<string> $recipients
      */
     private function buildEmail(array $recipients, string $subject, string $body): Email
     {
@@ -184,6 +219,8 @@ class MailService
     /**
      * Appends a debug record for this send attempt to the session mailer_debug log.
      * Does nothing when no session is available or not yet started.
+     *
+     * @param list<string> $recipients
      */
     private function logToSession(array $recipients, string $subject, bool $success, ?string $error = null): void
     {

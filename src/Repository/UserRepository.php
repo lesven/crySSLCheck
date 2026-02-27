@@ -58,4 +58,18 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
         return $qb->getQuery()->getOneOrNullResult();
     }
+
+    /** @return list<User> */
+    public function findAlertRecipients(): array
+    {
+        /** @var list<User> $users */
+        $users = $this->createQueryBuilder('u')
+            ->where('u.notifyAlerts = :notifyAlerts')
+            ->setParameter('notifyAlerts', true)
+            ->orderBy('u.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $users;
+    }
 }

@@ -28,6 +28,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255, options: ['default' => 'example@example.com'])]
     private string $email = 'example@example.com';
 
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $notifyAlerts = false;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -100,6 +103,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmail(string $email): static
     {
         $this->email = $email;
+
+        return $this;
+    }
+
+    public function isNotifyAlerts(): bool
+    {
+        return $this->notifyAlerts;
+    }
+
+    public function setNotifyAlerts(bool $notifyAlerts): static
+    {
+        $this->notifyAlerts = $notifyAlerts;
 
         return $this;
     }

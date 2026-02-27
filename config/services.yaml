@@ -58,6 +58,8 @@ services:
             $fromEmail: '%app.mailer_from_email%'
             $fromName: '%app.mailer_from_name%'
             $alertRecipients: '%app.alert_recipients%'
+            $userRepository: '@App\Repository\UserRepository'
+            $validationService: '@App\Service\ValidationService'
 
     App\Controller\DomainController:
         arguments:

@@ -68,6 +68,15 @@ class ValidationService
         return (bool) preg_match('/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/', $fqdn);
     }
 
+    public function isValidAlertEmail(string $email): bool
+    {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        return strtolower($email) !== 'example@example.com';
+    }
+
     /**
      * @return string[] List of error messages
      */

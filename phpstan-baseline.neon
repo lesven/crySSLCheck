@@ -198,35 +198,6 @@ parameters:
 			count: 1
 			path: src/Service/FindingPersister.php
 
-		-
-			message: '#^Method App\\Service\\MailService\:\:__construct\(\) has parameter \$alertRecipients with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Service/MailService.php
-
-		-
-			message: '#^Method App\\Service\\MailService\:\:buildEmail\(\) has parameter \$recipients with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Service/MailService.php
-
-		-
-			message: '#^Method App\\Service\\MailService\:\:getAlertRecipients\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Service/MailService.php
-
-		-
-			message: '#^Method App\\Service\\MailService\:\:logToSession\(\) has parameter \$recipients with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Service/MailService.php
-
-		-
-			message: '#^Method App\\Service\\MailService\:\:send\(\) has parameter \$recipients with no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Service/MailService.php
 
 		-
 			message: '#^Method App\\Service\\ScanService\:\:runSingleScan\(\) return type has no value type specified in iterable type array\.$#'
