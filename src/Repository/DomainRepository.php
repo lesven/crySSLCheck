@@ -3,7 +3,9 @@
 namespace App\Repository;
 
 use App\Entity\Domain;
+use App\Enum\DomainStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -28,6 +30,60 @@ class DomainRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function countAll(): int
+    {
+        return (int) $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countFiltered(?string $search): int
+    {
+        $qb = $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)');
+
+        $this->applySearchFilter($qb, $search);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * @return Domain[]
+     */
+    public function findPaginated(int $page, int $perPage): array
+    {
+        $page    = max(1, $page);
+        $perPage = max(1, $perPage);
+
+        return $this->createQueryBuilder('d')
+            ->orderBy('d.fqdn', 'ASC')
+            ->addOrderBy('d.port', 'ASC')
+            ->setFirstResult(($page - 1) * $perPage)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * @return array<int, Domain>
+     */
+    public function findPaginatedFiltered(int $page, int $perPage, ?string $search): array
+    {
+        $page    = max(1, $page);
+        $perPage = max(1, $perPage);
+
+        $qb = $this->createQueryBuilder('d')
+            ->orderBy('d.fqdn', 'ASC')
+            ->addOrderBy('d.port', 'ASC')
+            ->setFirstResult(($page - 1) * $perPage)
+            ->setMaxResults($perPage);
+
+        $this->applySearchFilter($qb, $search);
+
+        return $qb->getQuery()->getResult();
+    }
+
     /**
      * @return Domain[]
      */
@@ -35,7 +91,7 @@ class DomainRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('d')
             ->where('d.status = :status')
-            ->setParameter('status', 'active')
+            ->setParameter('status', DomainStatus::Active->value)
             ->orderBy('d.fqdn', 'ASC')
             ->addOrderBy('d.port', 'ASC')
             ->getQuery()
@@ -57,5 +113,15 @@ class DomainRepository extends ServiceEntityRepository
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    private function applySearchFilter(QueryBuilder $qb, ?string $search): void
+    {
+        if ($search === null) {
+            return;
+        }
+
+        $qb->andWhere('LOWER(d.fqdn) LIKE LOWER(:search)')
+            ->setParameter('search', '%' . $search . '%');
     }
 }

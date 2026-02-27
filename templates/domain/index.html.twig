@@ -23,7 +23,7 @@
             <a href="{{ path('domain_new') }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg"></i> Domain anlegen
             </a>
-            {% if domains is not empty %}
+            {% if total_count > 0 %}
                 <button type="button" class="btn btn-danger"
                         data-bs-toggle="modal" data-bs-target="#deleteAllModal"
                         title="Alle Domains löschen"
@@ -101,7 +101,30 @@
     </div>
 {% endif %}
 
-{% if domains is empty %}
+
+<form method="get" action="{{ path('domain_index') }}" class="row g-2 align-items-center mb-3">
+    <div class="col-sm-8 col-md-6 col-lg-5">
+        <input type="text"
+               class="form-control"
+               name="search"
+               value="{{ search|default('')|e('html_attr') }}"
+               maxlength="255"
+               placeholder="Domains durchsuchen (FQDN)">
+    </div>
+    <div class="col-auto d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Suchen</button>
+        {% if search is not empty %}
+            <a href="{{ path('domain_index') }}" class="btn btn-outline-secondary" aria-label="Suche zurücksetzen">&times;</a>
+        {% endif %}
+    </div>
+</form>
+
+{% if search is not empty %}
+    <div class="mb-3">
+        <span class="badge bg-info text-dark">{{ total_count }} Ergebnis{{ total_count != 1 ? 'se' : '' }} für „{{ search }}“</span>
+    </div>
+{% endif %}
+{% if total_count == 0 and search is empty %}
     <div class="alert alert-info">
         <i class="bi bi-info-circle"></i> Noch keine Domains vorhanden.
         {% if is_granted('ROLE_ADMIN') %}
@@ -109,6 +132,12 @@
         {% endif %}
     </div>
 {% else %}
+    {% if search is not empty and domains is empty %}
+        <div class="alert alert-warning">
+            <i class="bi bi-search"></i> Keine Domains gefunden für „{{ search }}“.
+            <a href="{{ path('domain_index') }}">Suche zurücksetzen</a>
+        </div>
+    {% else %}
     <div class="table-responsive">
         <table class="table table-hover">
             <thead class="table-dark">
@@ -154,6 +183,7 @@
 
                                     <form method="POST" action="{{ path('domain_scan', {id: domain.id}) }}" class="d-inline">
                                         <input type="hidden" name="_token" value="{{ csrf_token('scan-domain-' ~ domain.id) }}">
+                                        <input type="hidden" name="_page" value="{{ current_page }}">
                                         <button type="submit"
                                                 class="btn btn-outline-info"
                                                 {{ not domain.active ? 'disabled' : '' }}
@@ -177,6 +207,41 @@
             </tbody>
         </table>
     </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <small class="text-muted">
+            {{ total_count }} Domain{{ total_count != 1 ? 's' : '' }} gesamt
+            {% if total_pages > 1 %}
+                &ndash; Seite {{ current_page }} von {{ total_pages }}
+            {% endif %}
+        </small>
+        {% if total_pages > 1 %}
+            <nav aria-label="Domain-Seitennavigation">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item {{ current_page == 1 ? 'disabled' : '' }}">
+                        <a class="page-link" href="{{ path('domain_index', {page: current_page - 1}|merge(search is not empty ? {search: search} : {})) }}" aria-label="Zurück">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% for p in 1..total_pages %}
+                        {% if p == 1 or p == total_pages or (p >= current_page - 2 and p <= current_page + 2) %}
+                            <li class="page-item {{ p == current_page ? 'active' : '' }}">
+                                <a class="page-link" href="{{ path('domain_index', {page: p}|merge(search is not empty ? {search: search} : {})) }}">{{ p }}</a>
+                            </li>
+                        {% elseif p == current_page - 3 or p == current_page + 3 %}
+                            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    <li class="page-item {{ current_page == total_pages ? 'disabled' : '' }}">
+                        <a class="page-link" href="{{ path('domain_index', {page: current_page + 1}|merge(search is not empty ? {search: search} : {})) }}" aria-label="Vor">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        {% endif %}
+    </div>
+    {% endif %}
 {% endif %}
 
 {% if is_granted('ROLE_ADMIN') %}

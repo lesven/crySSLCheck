@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\ScanRunStatus;
 use App\Repository\ScanRunRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -32,7 +33,7 @@ class ScanRun
     {
         $this->findings = new ArrayCollection();
         $this->startedAt = new \DateTimeImmutable();
-        $this->status = 'running';
+        $this->status = ScanRunStatus::Running->value;
     }
 
     public function getId(): ?int

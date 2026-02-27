@@ -175,4 +175,142 @@ class DomainRepositoryTest extends IntegrationTestCase
         // domain1 itself is NOT excluded, so it's a duplicate
         $this->assertTrue($isDuplicate);
     }
+
+    // ── countAll ──────────────────────────────────────────────────────────────
+
+    public function testCountAllReturnsZeroWhenEmpty(): void
+    {
+        $this->assertSame(0, $this->repository->countAll());
+    }
+
+    public function testCountAllReturnsCorrectCount(): void
+    {
+        $this->createDomain('a.example.com');
+        $this->createDomain('b.example.com');
+        $this->createDomain('c.example.com');
+        $this->em->flush();
+
+        $this->assertSame(3, $this->repository->countAll());
+    }
+
+    public function testCountAllIncludesBothActiveAndInactiveDomains(): void
+    {
+        $this->createDomain('active.example.com', 443, 'active');
+        $this->createDomain('inactive.example.com', 443, 'inactive');
+        $this->em->flush();
+
+        $this->assertSame(2, $this->repository->countAll());
+    }
+
+    // ── findPaginated ─────────────────────────────────────────────────────────
+
+    public function testFindPaginatedReturnsFirstPage(): void
+    {
+        foreach (['c.example.com', 'a.example.com', 'b.example.com', 'e.example.com', 'd.example.com'] as $fqdn) {
+            $this->createDomain($fqdn);
+        }
+        $this->em->flush();
+
+        $result = $this->repository->findPaginated(1, 2);
+
+        $this->assertCount(2, $result);
+        $this->assertSame('a.example.com', $result[0]->getFqdn());
+        $this->assertSame('b.example.com', $result[1]->getFqdn());
+    }
+
+    public function testFindPaginatedReturnsSecondPage(): void
+    {
+        foreach (['c.example.com', 'a.example.com', 'b.example.com', 'e.example.com', 'd.example.com'] as $fqdn) {
+            $this->createDomain($fqdn);
+        }
+        $this->em->flush();
+
+        $result = $this->repository->findPaginated(2, 2);
+
+        $this->assertCount(2, $result);
+        $this->assertSame('c.example.com', $result[0]->getFqdn());
+        $this->assertSame('d.example.com', $result[1]->getFqdn());
+    }
+
+    public function testFindPaginatedReturnsLastPageWithRemainder(): void
+    {
+        foreach (['a.example.com', 'b.example.com', 'c.example.com'] as $fqdn) {
+            $this->createDomain($fqdn);
+        }
+        $this->em->flush();
+
+        $result = $this->repository->findPaginated(2, 2);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('c.example.com', $result[0]->getFqdn());
+    }
+
+    public function testFindPaginatedReturnsEmptyArrayForOutOfRangePage(): void
+    {
+        $this->createDomain('a.example.com');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginated(99, 10);
+
+        $this->assertSame([], $result);
+    }
+
+    public function testFindPaginatedClampsPageToMinimumOfOne(): void
+    {
+        $this->createDomain('a.example.com');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginated(0, 10);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('a.example.com', $result[0]->getFqdn());
+    }
+
+
+    // ── countFiltered / findPaginatedFiltered ────────────────────────────────
+
+    public function testCountFilteredReturnsAllWhenNoSearch(): void
+    {
+        $this->createDomain('alpha.example.com');
+        $this->createDomain('beta.example.com');
+        $this->em->flush();
+
+        $this->assertSame(2, $this->repository->countFiltered(null));
+    }
+
+    public function testCountFilteredFiltersCorrectly(): void
+    {
+        $this->createDomain('alpha.example.com');
+        $this->createDomain('beta.example.com');
+        $this->createDomain('alpha-test.example.com');
+        $this->em->flush();
+
+        $this->assertSame(2, $this->repository->countFiltered('alpha'));
+    }
+
+    public function testFindPaginatedFilteredReturnsMatchingDomains(): void
+    {
+        $this->createDomain('api.example.com');
+        $this->createDomain('mail.example.com');
+        $this->createDomain('api.internal.example.com');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginatedFiltered(1, 10, 'api');
+
+        $this->assertCount(2, $result);
+        $this->assertSame('api.example.com', $result[0]->getFqdn());
+        $this->assertSame('api.internal.example.com', $result[1]->getFqdn());
+    }
+
+    public function testFindPaginatedFilteredIsCaseInsensitive(): void
+    {
+        $this->createDomain('MiXeD.Example.com');
+        $this->em->flush();
+
+        $result = $this->repository->findPaginatedFiltered(1, 10, 'mixed');
+
+        $this->assertCount(1, $result);
+        $this->assertSame('MiXeD.Example.com', $result[0]->getFqdn());
+    }
+
 }

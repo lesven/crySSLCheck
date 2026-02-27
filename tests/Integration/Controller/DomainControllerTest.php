@@ -429,4 +429,184 @@ class DomainControllerTest extends WebTestCase
             $this->assertResponseStatusCodeSame(403, "Route $route should require admin role");
         }
     }
+
+    // ── Pagination ────────────────────────────────────────────────────────────
+
+    public function testIndexPageShowsNoPaginationForFewDomains(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        // DOMAINS_PER_PAGE=5 in .env.test; create fewer domains
+        foreach (['a.example.com', 'b.example.com'] as $fqdn) {
+            $this->createTestDomain($fqdn);
+        }
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorNotExists('nav[aria-label="Domain-Seitennavigation"]');
+    }
+
+    public function testIndexPageShowsPaginationWhenExceedingPerPage(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        // DOMAINS_PER_PAGE=5 – create 6 domains to trigger pagination
+        foreach (range(1, 6) as $i) {
+            $this->createTestDomain(sprintf('domain%02d.example.com', $i));
+        }
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('nav[aria-label="Domain-Seitennavigation"]');
+    }
+
+    public function testIndexPageDefaultsToPageOne(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        foreach (range(1, 6) as $i) {
+            $this->createTestDomain(sprintf('domain%02d.example.com', $i));
+        }
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains');
+
+        $this->assertResponseIsSuccessful();
+        // First 5 domains visible (page 1), last one not
+        $this->assertSelectorTextContains('body', 'domain01.example.com');
+        $this->assertSelectorTextContains('body', 'domain05.example.com');
+        $this->assertStringNotContainsString('domain06.example.com', (string) $client->getResponse()->getContent());
+    }
+
+    public function testIndexPageTwoShowsCorrectDomains(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        foreach (range(1, 6) as $i) {
+            $this->createTestDomain(sprintf('domain%02d.example.com', $i));
+        }
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains?page=2');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'domain06.example.com');
+        $this->assertStringNotContainsString('domain01.example.com', (string) $client->getResponse()->getContent());
+    }
+
+    public function testIndexPageWithInvalidPageParamDefaultsToPageOne(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+        $this->createTestDomain('only.example.com');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains?page=99');
+
+        $this->assertResponseIsSuccessful();
+        // Still on page 1 (clamped) – domain visible
+        $this->assertSelectorTextContains('body', 'only.example.com');
+    }
+
+    public function testIndexPageShowsTotalDomainCount(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        foreach (range(1, 6) as $i) {
+            $this->createTestDomain(sprintf('domain%02d.example.com', $i));
+        }
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', '6 Domains gesamt');
+    }
+
+
+    public function testIndexWithSearchReturnsFilteredResults(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        $this->createTestDomain('alpha.example.com');
+        $this->createTestDomain('beta.example.com');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains?search=alpha');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'alpha.example.com');
+        $this->assertStringNotContainsString('beta.example.com', (string) $client->getResponse()->getContent());
+        $this->assertSelectorTextContains('body', '1 Ergebnis');
+    }
+
+    public function testIndexWithEmptySearchBehavesLikeNoFilter(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        $this->createTestDomain('alpha.example.com');
+        $this->createTestDomain('beta.example.com');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains?search=');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'alpha.example.com');
+        $this->assertSelectorTextContains('body', 'beta.example.com');
+    }
+
+    public function testSearchTermIsPreservedOnPagination(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        foreach (range(1, 6) as $i) {
+            $this->createTestDomain(sprintf('app%02d.example.com', $i));
+        }
+        $this->createTestDomain('other.example.com');
+
+        $client->loginUser($user);
+        $crawler = $client->request('GET', '/domains?search=app');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('nav[aria-label="Domain-Seitennavigation"]');
+
+        $nextLink = $crawler->filter('nav[aria-label="Domain-Seitennavigation"] a[aria-label="Vor"]')->attr('href');
+        $this->assertStringContainsString('search=app', (string) $nextLink);
+
+        $client->request('GET', '/domains?search=app&page=2');
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'app06.example.com');
+    }
+
+    public function testResetSearchReturnsFullList(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser();
+
+        $this->createTestDomain('alpha.example.com');
+        $this->createTestDomain('beta.example.com');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains?search=alpha');
+        $this->assertResponseIsSuccessful();
+        $this->assertStringNotContainsString('beta.example.com', (string) $client->getResponse()->getContent());
+
+        $client->request('GET', '/domains');
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'alpha.example.com');
+        $this->assertSelectorTextContains('body', 'beta.example.com');
+    }
+
 }

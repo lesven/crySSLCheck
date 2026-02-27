@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Domain;
+use App\Enum\DomainStatus;
 use App\Repository\DomainRepository;
 use App\Service\MailService;
 use App\Service\ValidationService;
@@ -22,6 +23,7 @@ class DomainController extends AbstractController
         private readonly DomainRepository $domainRepository,
         private readonly ValidationService $validationService,
         private readonly MailService $mailService,
+        private readonly int $domainsPerPage = 25,
     ) {
     }
 
@@ -35,12 +37,29 @@ class DomainController extends AbstractController
         $session->remove('scan_results');
         $session->remove('mailer_debug');
 
+        $search = trim((string) $request->query->get('search', ''));
+        $search = mb_substr($search, 0, 255);
+        $search = $search === '' ? null : $search;
+
+        $totalCount = $this->domainRepository->countFiltered($search);
+        $totalPages = $totalCount > 0 ? (int) ceil($totalCount / $this->domainsPerPage) : 1;
+        $page       = max(1, (int) $request->query->get('page', 1));
+
+        if ($totalPages < $page) {
+            $page = max(1, $totalPages);
+        }
+
         return $this->render('domain/index.html.twig', [
-            'domains'           => $this->domainRepository->findAllOrderedByFqdn(),
+            'domains'           => $this->domainRepository->findPaginatedFiltered($page, $this->domainsPerPage, $search),
             'scan_results'      => $scanResults,
             'mailer_debug'      => $mailerDebug,
             'mailer_configured' => $this->mailService->isConfigured(),
             'alert_recipients'  => implode(', ', $this->mailService->getAlertRecipients()),
+            'current_page'      => $page,
+            'total_pages'       => $totalPages,
+            'total_count'       => $totalCount,
+            'domains_per_page'  => $this->domainsPerPage,
+            'search'            => $search,
         ]);
     }
 
@@ -112,7 +131,7 @@ class DomainController extends AbstractController
                     $status = null;
                     if ($statusCol !== false) {
                         $rawStatus = strtolower(trim($row[$statusCol] ?? ''));
-                        $status    = in_array($rawStatus, ['active', 'inactive'], true) ? $rawStatus : null;
+                        $status    = in_array($rawStatus, [DomainStatus::Active->value, DomainStatus::Inactive->value], true) ? $rawStatus : null;
                     }
 
                     $existing = $this->domainRepository->findOneBy(['fqdn' => $fqdn, 'port' => $port]);
@@ -166,7 +185,7 @@ class DomainController extends AbstractController
                     $domain->getFqdn(),
                     $domain->getPort(),
                     $domain->getDescription() ?? '',
-                    $domain->isActive() ? 'active' : 'inactive',
+                    $domain->isActive() ? DomainStatus::Active->value : DomainStatus::Inactive->value,
                 ], ',', '"', '');
             }
             fclose($handle);

@@ -39,7 +39,8 @@ class CreateUserCommandTest extends IntegrationTestCase
         ]);
 
         $this->assertSame(0, $exitCode);
-        $this->assertStringContainsString('erfolgreich erstellt', $this->commandTester->getDisplay());
+        $display = preg_replace('/\s+/', ' ', $this->commandTester->getDisplay());
+        $this->assertStringContainsString('erfolgreich erstellt', $display);
 
         $user = $this->userRepository->findByUsername('testuser');
         $this->assertNotNull($user);
@@ -58,7 +59,8 @@ class CreateUserCommandTest extends IntegrationTestCase
         ]);
 
         $this->assertSame(0, $exitCode);
-        $this->assertStringContainsString('erfolgreich erstellt', $this->commandTester->getDisplay());
+        $display = preg_replace('/\s+/', ' ', $this->commandTester->getDisplay());
+        $this->assertStringContainsString('erfolgreich erstellt', $display);
 
         $user = $this->userRepository->findByUsername('adminuser');
         $this->assertNotNull($user);

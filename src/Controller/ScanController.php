@@ -37,6 +37,8 @@ class ScanController extends AbstractController
             return $this->redirectToRoute('domain_index');
         }
 
+        $page = max(1, (int) $request->request->get('_page', 1));
+
         try {
             $results = $this->scanService->runSingleScan($domain);
             $this->addFlash('success', "Scan für {$domain->getFqdn()}:{$domain->getPort()} abgeschlossen.");
@@ -45,7 +47,7 @@ class ScanController extends AbstractController
             $this->addFlash('error', 'Scan-Fehler: ' . $e->getMessage());
         }
 
-        return $this->redirectToRoute('domain_index');
+        return $this->redirectToRoute('domain_index', $page > 1 ? ['page' => $page] : []);
     }
 
     #[Route('/smtp-test', name: 'smtp_test', methods: ['POST'])]
