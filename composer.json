@@ -29,6 +29,7 @@
         "twig/twig": "^3.0"
     },
     "require-dev": {
+        "doctrine/doctrine-fixtures-bundle": "^4.3",
         "nunomaduro/phpinsights": "^2.13",
         "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-symfony": "^2.0",

@@ -1,0 +1,18 @@
+{
+  "admin": {
+    "username": "admin",
+    "password": "admin123",
+    "email": "admin@tls-monitor.local",
+    "role": "admin"
+  },
+  "auditor": {
+    "username": "auditor",
+    "password": "auditor123",
+    "email": "auditor@tls-monitor.local",
+    "role": "auditor"
+  },
+  "invalid": {
+    "username": "notexisting",
+    "password": "wrongpassword"
+  }
+}
