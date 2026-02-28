@@ -73,11 +73,11 @@ class MailService
 
         $body = "TLS Monitor – Neues Finding\n"
             . "=============================\n\n"
-            . "Domain:       {$domain->getFqdn()}\n"
-            . "Port:         {$domain->getPort()}\n"
-            . "Finding-Typ:  {$finding->getFindingType()}\n"
-            . "Severity:     {$finding->getSeverity()}\n"
-            . "Zeitpunkt:    " . (new \DateTimeImmutable())->format('Y-m-d H:i:s') . "\n";
+            . 'Domain:       ' . $domain->getFqdn() . "\n"
+            . 'Port:         ' . $domain->getPort() . "\n"
+            . 'Finding-Typ:  ' . $finding->getFindingType() . "\n"
+            . 'Severity:     ' . $finding->getSeverity() . "\n"
+            . 'Zeitpunkt:    ' . (new \DateTimeImmutable())->format('Y-m-d H:i:s') . "\n";
 
         if (isset($details['days_remaining'])) {
             $body .= "Verbleibend:  {$details['days_remaining']} Tage\n";
@@ -112,9 +112,9 @@ class MailService
         return $this->send(
             [$recipient],
             '[TLS Monitor] Test-Mail',
-            "Dies ist eine Test-Mail vom TLS Monitor.\n\n"
-            . "Zeitpunkt: " . (new \DateTimeImmutable())->format('Y-m-d H:i:s') . "\n\n"
-            . "SMTP-Konfiguration ist funktionsfähig."
+            'Dies ist eine Test-Mail vom TLS Monitor.\n\n'
+            . 'Zeitpunkt: ' . (new \DateTimeImmutable())->format('Y-m-d H:i:s') . "\n\n"
+            . 'SMTP-Konfiguration ist funktionsfähig.'
         );
     }
 
@@ -123,10 +123,10 @@ class MailService
         return $this->send(
             [$recipient],
             '[TLS Monitor] Ihr neues Passwort',
-            "Ihr Passwort für den TLS Monitor wurde zurückgesetzt.\n\n"
-            . "Neues Passwort: {$newPassword}\n\n"
-            . "Bitte melden Sie sich an und ändern Sie Ihr Passwort umgehend.\n\n"
-            . "Zeitpunkt: " . (new \DateTimeImmutable())->format('Y-m-d H:i:s') . "\n"
+            'Ihr Passwort für den TLS Monitor wurde zurückgesetzt.\n\n'
+            . 'Neues Passwort: ' . $newPassword . "\n\n"
+            . 'Bitte melden Sie sich an und ändern Sie Ihr Passwort umgehend.\n\n'
+            . 'Zeitpunkt: ' . (new \DateTimeImmutable())->format('Y-m-d H:i:s') . "\n"
         );
     }
 

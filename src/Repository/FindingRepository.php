@@ -56,18 +56,18 @@ class FindingRepository extends ServiceEntityRepository
 
         if ($problemsOnly) {
             $qb->andWhere('f.findingType != :ok')
-               ->setParameter('ok', FindingType::Ok->value);
+                ->setParameter('ok', FindingType::Ok->value);
         }
 
         if ($runId !== null) {
             $qb->andWhere('f.scanRun = :runId')
-               ->setParameter('runId', $runId);
+                ->setParameter('runId', $runId);
         }
 
         if ($search !== null && $search !== '') {
             $escapedSearch = strtr($search, ['!' => '!!', '%' => '!%', '_' => '!_']);
             $qb->andWhere("d.fqdn LIKE :search ESCAPE '!'")
-               ->setParameter('search', '%' . $escapedSearch . '%');
+                ->setParameter('search', '%' . $escapedSearch . '%');
         }
 
         return (int) $qb->getQuery()->getSingleScalarResult();

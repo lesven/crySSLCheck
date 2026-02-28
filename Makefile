@@ -97,3 +97,6 @@ test-coverage: ## Führt Tests mit Code Coverage aus
 
 lint: ## Führt PHPStan statische Analyse aus
 	docker compose exec tls-monitor php -d memory_limit=512M /var/www/html/vendor/bin/phpstan analyse --no-progress
+
+insights: ## Führt PHPInsights Code-Quality-Analyse aus
+	docker compose exec tls-monitor php -d memory_limit=1G /var/www/html/vendor/bin/phpinsights analyse src --no-interaction --disable-security-check --composer /var/www/html/composer.lock

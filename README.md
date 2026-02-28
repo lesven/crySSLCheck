@@ -25,15 +25,49 @@ make restart   # startet Container neu, der Mount bleibt bestehen
 
 ## Inhaltsverzeichnis
 
-1. [Epics & Stories im Scope](#epics--stories-im-scope)
-2. [Epic: Domain-Verwaltung](#epic-domain-verwaltung)
-3. [Epic: Scan-Engine & Scheduler](#epic-scan-engine--scheduler)
-4. [Epic: Reporting & E-Mail-Benachrichtigungen](#epic-reporting--e-mail-benachrichtigungen)
-5. [Epic: Rollen, Rechte & Nachvollziehbarkeit](#epic-rollen-rechte--nachvollziehbarkeit)
-6. [Epic: Konfiguration & Betrieb](#epic-konfiguration--betrieb)
-7. [Datenbank-Schema](#datenbank-schema)
-8. [Empfohlene Dateistruktur](#empfohlene-dateistruktur)
-9. [Out-of-Scope (Ausbaustufe 1)](#out-of-scope-ausbaustufe-1)
+1. [Qualitätssicherung](#qualitätssicherung)
+2. [Epics & Stories im Scope](#epics--stories-im-scope)
+3. [Epic: Domain-Verwaltung](#epic-domain-verwaltung)
+4. [Epic: Scan-Engine & Scheduler](#epic-scan-engine--scheduler)
+5. [Epic: Reporting & E-Mail-Benachrichtigungen](#epic-reporting--e-mail-benachrichtigungen)
+6. [Epic: Rollen, Rechte & Nachvollziehbarkeit](#epic-rollen-rechte--nachvollziehbarkeit)
+7. [Epic: Konfiguration & Betrieb](#epic-konfiguration--betrieb)
+8. [Datenbank-Schema](#datenbank-schema)
+9. [Empfohlene Dateistruktur](#empfohlene-dateistruktur)
+10. [Out-of-Scope (Ausbaustufe 1)](#out-of-scope-ausbaustufe-1)
+
+---
+
+## Qualitätssicherung
+
+Das Projekt nutzt automatisierte Werkzeuge zur Code-Qualitätsprüfung (alle Befehle laufen im Docker-Container via `make`):
+
+### Testing & Linting
+
+```bash
+make test                 # Alle PHPUnit Tests (Unit + Integration)
+make test-unit           # Nur Unit Tests (keine DB)
+make test-integration    # Nur Integration Tests (SQLite)
+make test-coverage       # Tests mit HTML-Coverage Report (var/coverage/)
+make lint                # PHPStan statische Analyse (Level 6)
+make insights            # PHPInsights Code-Quality-Analyse (Symfony Preset)
+```
+
+### Qualitäts-Pipeline
+
+Nach **jeder Änderung** sollten alle QA-Tools durchlaufen:
+
+```bash
+make test && make lint && make insights
+```
+
+**PHPInsights Metriken** (Symfony-Preset):
+- **Code Quality** (86%): Zyklomatische Komplexität, Größe von Klassen/Methoden
+- **Complexity** (68.5%): Code-Wartbarkeit und Testbarkeit
+- **Architecture** (76.5%): Schichtenkohärenz, DRY-Prinzip
+- **Style** (88%): PSR-12, Single Quotes, Import-Ordnung
+
+**Hinweis:** Bei roten Violations in PHPInsights vor dem Commit überprüfen – oft sind dies Optimierungsmöglichkeiten (z.B. Setter in Entities, Array-Indentation).
 
 ---
 
