@@ -1,0 +1,31 @@
+{
+  "valid": [
+    {
+      "fqdn": "google.com",
+      "port": "443",
+      "description": "Google – Referenz-Domain für gültige Zertifikate"
+    },
+    {
+      "fqdn": "github.com",
+      "port": "443",
+      "description": "GitHub – Code-Hosting-Plattform"
+    }
+  ],
+  "invalid": [
+    {
+      "fqdn": "not a valid domain!!",
+      "port": "443",
+      "description": "Ungültige Domain"
+    },
+    {
+      "fqdn": "example.com",
+      "port": "99999",
+      "description": "Ungültiger Port"
+    }
+  ],
+  "new": {
+    "fqdn": "testcafe-e2e.example.com",
+    "port": "443",
+    "description": "Vom E2E-Test angelegte Domain"
+  }
+}
