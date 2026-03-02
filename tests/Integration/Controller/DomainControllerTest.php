@@ -6,6 +6,7 @@ use App\Controller\DomainController;
 use App\Entity\Domain;
 use App\Entity\User;
 use App\Repository\DomainRepository;
+use App\Service\TlsConnectorInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -607,6 +608,242 @@ class DomainControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $this->assertSelectorTextContains('body', 'alpha.example.com');
         $this->assertSelectorTextContains('body', 'beta.example.com');
+    }
+
+    // ── Entry Zero Import ─────────────────────────────────────────────────────
+
+    private function buildEntryZeroCsvFile(string $content): UploadedFile
+    {
+        $tmpFile = tmpfile();
+        $tmpPath = stream_get_meta_data($tmpFile)['uri'];
+        fwrite($tmpFile, $content);
+        fseek($tmpFile, 0);
+
+        // Keep a reference so the resource isn't garbage-collected during the request
+        $this->tmpFileHandles[] = $tmpFile;
+
+        return new UploadedFile($tmpPath, 'entry_zero.csv', 'text/csv', null, true);
+    }
+
+    /**
+     * Install a stub TlsConnector in the test container.
+     *
+     * @param array<string, mixed>|null $tlsReturn  null = unreachable, array = reachable
+     */
+    private function mockTlsConnector(array|null $tlsReturn = ['subject' => 'CN=test']): void
+    {
+        $stub = $this->createStub(TlsConnectorInterface::class);
+        $stub->method('connect')->willReturn($tlsReturn);
+        static::getContainer()->set(TlsConnectorInterface::class, $stub);
+    }
+
+    /** @var resource[] */
+    private array $tmpFileHandles = [];
+
+    public function testImportEntryZeroPageRendersForAdmin(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains/import-entry-zero');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorExists('input[type="file"][name="csv_file"]');
+        $this->assertSelectorTextContains('h2', 'Entry Zero Import');
+    }
+
+    public function testImportEntryZeroRequiresAdminRole(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('auditor', 'auditor');
+
+        $client->loginUser($user);
+        $client->request('GET', '/domains/import-entry-zero');
+
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testImportEntryZeroCreatesDomainsFromJsonArray(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+        $this->mockTlsConnector();
+
+        $csvContent  = "\"Main Domain\",\"Subdomains Count\",Subdomains,Country,Company\n";
+        $csvContent .= "\"domain1.de\",2,\"[\"\"shop.domain1.de\"\",\"\"www.domain1.de\"\"]\",DE,\"Firma Eins\"\n";
+
+        $client->loginUser($user);
+        $client->request('POST', '/domains/import-entry-zero', [], [
+            'csv_file' => $this->buildEntryZeroCsvFile($csvContent),
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('body', 'Neu angelegt');
+
+        $em         = static::getContainer()->get(EntityManagerInterface::class);
+        $domainRepo = $em->getRepository(Domain::class);
+
+        $d1 = $domainRepo->findOneBy(['fqdn' => 'shop.domain1.de', 'port' => 443]);
+        $this->assertNotNull($d1);
+        $this->assertSame('Firma Eins', $d1->getDescription());
+        $this->assertTrue($d1->isActive());
+
+        $d2 = $domainRepo->findOneBy(['fqdn' => 'www.domain1.de', 'port' => 443]);
+        $this->assertNotNull($d2);
+        $this->assertSame('Firma Eins', $d2->getDescription());
+    }
+
+    public function testImportEntryZeroHandlesSingleSubdomain(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+        $this->mockTlsConnector();
+
+        $csvContent  = "\"Main Domain\",\"Subdomains Count\",Subdomains,Country,Company\n";
+        $csvContent .= "\"domain4.de\",1,\"www.domain4.de\",BE,\"Firma Vier\"\n";
+
+        $client->loginUser($user);
+        $client->request('POST', '/domains/import-entry-zero', [], [
+            'csv_file' => $this->buildEntryZeroCsvFile($csvContent),
+        ]);
+
+        $this->assertResponseIsSuccessful();
+
+        $em         = static::getContainer()->get(EntityManagerInterface::class);
+        $domainRepo = $em->getRepository(Domain::class);
+
+        $domain = $domainRepo->findOneBy(['fqdn' => 'www.domain4.de', 'port' => 443]);
+        $this->assertNotNull($domain);
+        $this->assertSame('Firma Vier', $domain->getDescription());
+    }
+
+    public function testImportEntryZeroDuplicateUpdatesDescription(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+        $this->mockTlsConnector();
+
+        // Pre-create the domain
+        $this->createTestDomain('www.existing.de', 443);
+
+        $csvContent  = "\"Main Domain\",\"Subdomains Count\",Subdomains,Country,Company\n";
+        $csvContent .= "\"existing.de\",1,\"www.existing.de\",DE,\"Aktualisierte Firma\"\n";
+
+        $client->loginUser($user);
+        $client->request('POST', '/domains/import-entry-zero', [], [
+            'csv_file' => $this->buildEntryZeroCsvFile($csvContent),
+        ]);
+
+        $this->assertResponseIsSuccessful();
+
+        $em         = static::getContainer()->get(EntityManagerInterface::class);
+        $domainRepo = $em->getRepository(Domain::class);
+
+        // Only 1 domain with this FQDN must exist (no duplicate)
+        $all = $domainRepo->findBy(['fqdn' => 'www.existing.de', 'port' => 443]);
+        $this->assertCount(1, $all);
+        $this->assertSame('Aktualisierte Firma', $all[0]->getDescription());
+
+        $this->assertSelectorTextContains('body', 'Aktualisiert');
+    }
+
+    public function testImportEntryZeroRejectsInvalidFqdns(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+
+        $csvContent  = "\"Main Domain\",\"Subdomains Count\",Subdomains,Country,Company\n";
+        $csvContent .= "\"bad.de\",1,\"not_a_valid_domain\",DE,\"Fehler Firma\"\n";
+
+        $client->loginUser($user);
+        $client->request('POST', '/domains/import-entry-zero', [], [
+            'csv_file' => $this->buildEntryZeroCsvFile($csvContent),
+        ]);
+
+        $this->assertResponseIsSuccessful();
+
+        $em         = static::getContainer()->get(EntityManagerInterface::class);
+        $domainRepo = $em->getRepository(Domain::class);
+
+        $this->assertCount(0, $domainRepo->findAll());
+        $this->assertSelectorTextContains('body', 'Fehler');
+    }
+
+    public function testImportEntryZeroRejectsFileWithoutSubdomainsColumn(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+
+        $csvContent = "\"Main Domain\",Country,Company\n";
+        $csvContent .= "\"domain1.de\",DE,\"Firma Eins\"\n";
+
+        $client->loginUser($user);
+        $client->request('POST', '/domains/import-entry-zero', [], [
+            'csv_file' => $this->buildEntryZeroCsvFile($csvContent),
+        ]);
+
+        // Should redirect back with a flash error
+        $this->assertResponseRedirects('/domains/import-entry-zero');
+    }
+
+    public function testImportEntryZeroFullExampleFile(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+        $this->mockTlsConnector();
+
+        // Reproduces the EntryZeroImportExample.csv structure:
+        // domain1: 4 subdomains, domain2: 2, domain3: 2, domain4: 1 (plain string) → 9 total
+        $csvContent  = "\"Main Domain\",\"Subdomains Count\",Subdomains,Country,Company\n";
+        $csvContent .= "\"domain1.de\",4,\"[\"\"shop-dev.domain1.de\"\",\"\"shop-test.domain1.de\"\",\"\"shop.domain1.de\"\",\"\"www.domain1.de\"\"]\",DE,\"Company 1\"\n";
+        $csvContent .= "\"domain2.info\",2,\"[\"\"dev.domain2.info\"\",\"\"test.domain2.info\"\"]\",DE,\"Company 2\"\n";
+        $csvContent .= "\"domain3.de\",2,\"[\"\"news.domain3.de\"\",\"\"www.domain3.de\"\"]\",DE,\"Company 3\"\n";
+        $csvContent .= "\"domain4.de\",1,\"www.domain4.de\",BE,\"Company 4\"\n";
+
+        $client->loginUser($user);
+        $client->request('POST', '/domains/import-entry-zero', [], [
+            'csv_file' => $this->buildEntryZeroCsvFile($csvContent),
+        ]);
+
+        $this->assertResponseIsSuccessful();
+
+        $em         = static::getContainer()->get(EntityManagerInterface::class);
+        $domainRepo = $em->getRepository(Domain::class);
+
+        $this->assertCount(9, $domainRepo->findAll());
+
+        // Spot-check one domain per source row
+        $this->assertNotNull($domainRepo->findOneBy(['fqdn' => 'shop.domain1.de',  'port' => 443]));
+        $this->assertNotNull($domainRepo->findOneBy(['fqdn' => 'dev.domain2.info', 'port' => 443]));
+        $this->assertNotNull($domainRepo->findOneBy(['fqdn' => 'news.domain3.de',  'port' => 443]));
+        $this->assertNotNull($domainRepo->findOneBy(['fqdn' => 'www.domain4.de',   'port' => 443]));
+    }
+
+    public function testImportEntryZeroSkipsUnreachableDomains(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+        // Connector returns null = unreachable for all domains
+        $this->mockTlsConnector(null);
+
+        $csvContent  = "\"Main Domain\",\"Subdomains Count\",Subdomains,Country,Company\n";
+        $csvContent .= "\"domain1.de\",2,\"[\"\"shop.domain1.de\"\",\"\"www.domain1.de\"\"]\",DE,\"Firma Eins\"\n";
+
+        $client->loginUser($user);
+        $client->request('POST', '/domains/import-entry-zero', [], [
+            'csv_file' => $this->buildEntryZeroCsvFile($csvContent),
+        ]);
+
+        $this->assertResponseIsSuccessful();
+
+        $em         = static::getContainer()->get(EntityManagerInterface::class);
+        $domainRepo = $em->getRepository(Domain::class);
+
+        // No domains must have been persisted
+        $this->assertCount(0, $domainRepo->findAll());
+        // Page must show the "not reachable" section
+        $this->assertSelectorTextContains('body', 'Nicht erreichbar');
     }
 
 }

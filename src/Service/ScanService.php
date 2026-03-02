@@ -48,7 +48,7 @@ class ScanService
             return $scanRun;
         }
 
-        $this->logger->info("Scan-Run #{$scanRun->getId()} gestartet mit " . count($domains) . " Domains.");
+        $this->logger->info("Scan-Run #{$scanRun->getId()} gestartet mit " . count($domains) . ' Domains.');
 
         $hasErrors = false;
         $allFailed = true;

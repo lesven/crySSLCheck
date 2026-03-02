@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs shell clean ps scan create-user test test-unit test-integration test-coverage lint
+.PHONY: help build up down restart logs shell clean ps scan scan-force import-entry-zero create-user test test-unit test-integration test-coverage lint test-e2e test-e2e-setup
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Befehle:"
@@ -50,6 +50,16 @@ scan: ## Führt einen manuellen Scan aus
 scan-force: ## Führt einen manuellen Scan aus (erzwingt Scan auch wenn heute bereits erfolgreich)
 	docker compose exec tls-monitor php /var/www/html/bin/console app:scan --force
 
+import-entry-zero: ## Entry Zero CSV importieren (Übergabe: FILE=/pfad/zur/datei.csv [DRYRUN=1])
+	@if [ -z "$(FILE)" ]; then \
+		echo "Fehler: FILE=/pfad/zur/datei.csv muss angegeben werden"; exit 1; \
+	fi
+	@if [ -n "$(DRYRUN)" ]; then \
+		docker compose exec tls-monitor php /var/www/html/bin/console app:import-entry-zero "/var/www/html/$(FILE)" --dry-run; \
+	else \
+		docker compose exec tls-monitor php /var/www/html/bin/console app:import-entry-zero "/var/www/html/$(FILE)"; \
+	fi
+
 create-user: ## Erstellt einen neuen Benutzer (Übergabe: USERNAME=user PASSWORD=pass [ROLE=admin|auditor])
 	@if [ -n "$(USERNAME)" ] && [ -n "$(PASSWORD)" ]; then \
 		ROLE=$${ROLE:-auditor}; \
@@ -97,3 +107,13 @@ test-coverage: ## Führt Tests mit Code Coverage aus
 
 lint: ## Führt PHPStan statische Analyse aus
 	docker compose exec tls-monitor php -d memory_limit=512M /var/www/html/vendor/bin/phpstan analyse --no-progress
+
+insights: ## Führt PHPInsights Code-Quality-Analyse aus
+	docker compose exec tls-monitor php -d memory_limit=1G /var/www/html/vendor/bin/phpinsights analyse src --no-interaction --disable-security-check --composer /var/www/html/composer.lock
+
+test-e2e-setup: ## Installiert E2E-Abhängigkeiten und lädt Fixtures
+	cd e2e && npm install
+	docker compose exec tls-monitor php /var/www/html/bin/console doctrine:fixtures:load --no-interaction
+
+test-e2e: ## Führt E2E-Tests aus (Container muss laufen, vorher: make test-e2e-setup)
+	cd e2e && npx testcafe chrome:headless tests/

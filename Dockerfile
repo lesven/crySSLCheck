@@ -30,7 +30,8 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock symfony.lock ./
 
 # PHP-Abhängigkeiten installieren (inkl. Dev-Dependencies für Developer Mode)
-RUN composer install --optimize-autoloader --no-interaction --no-scripts
+# Falls lock-Datei veraltet ist, mit --with-all-dependencies updaten (ermöglicht Kompatibilität mit neuen Packages)
+RUN /bin/bash -c "composer install --optimize-autoloader --no-interaction --no-scripts 2>&1 | grep -q 'not up to date' && composer update --no-interaction --no-scripts --with-all-dependencies || composer install --optimize-autoloader --no-interaction --no-scripts"
 
 # Anwendungsdateien kopieren
 COPY . .

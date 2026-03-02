@@ -1,0 +1,15 @@
+{
+  "browsers": ["chromium:headless"],
+  "src": "tests/**/*.test.js",
+  "baseUrl": "http://localhost:8443",
+  "screenshotsOnFails": true,
+  "screenshots": {
+    "path": "screenshots",
+    "takeOnFails": true,
+    "pathPattern": "${DATE}_${TIME}/${FIXTURE}/${TEST_INDEX}/${FILE_INDEX}.png"
+  },
+  "pageLoadTimeout": 10000,
+  "selectorTimeout": 8000,
+  "assertionTimeout": 8000,
+  "speed": 0.8
+}

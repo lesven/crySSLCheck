@@ -13,6 +13,9 @@
             <a href="{{ path('domain_import') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-upload"></i> CSV Import
             </a>
+            <a href="{{ path('domain_import_entry_zero') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-arrow-up"></i> Entry Zero Import
+            </a>
             <button type="button"
                     class="btn btn-outline-{{ mailer_configured ? 'success' : 'warning' }}"
                     data-bs-toggle="modal" data-bs-target="#mailTestModal"
@@ -210,6 +213,8 @@
 
     <div class="d-flex justify-content-between align-items-center mt-3">
         <small class="text-muted">
+            DEBUG: total_count={{ total_count }}, total_pages={{ total_pages }}, domains_per_page={{ domains_per_page }}
+            <br>
             {{ total_count }} Domain{{ total_count != 1 ? 's' : '' }} gesamt
             {% if total_pages > 1 %}
                 &ndash; Seite {{ current_page }} von {{ total_pages }}

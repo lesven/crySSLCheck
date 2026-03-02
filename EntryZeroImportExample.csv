@@ -1,0 +1,5 @@
+﻿"Main Domain","Subdomains Count",Subdomains,Country,Company
+"domain1.de",4,"[""shop-dev.domain1.de"",""shop-test.domain1.de"",""shop.domain1.de"",""www.domain1.de""]",DE,"Company 1"
+"domain2.info",2,"[""dev.domain2.info"",""test.domain2.info""]",DE,"Company 2"
+"domain3.de",2,"[""news.domain3.de"",""www.domain3.de""]",DE,"Company 3"
+"domain4.de",1,"www.domain4.de",BE,"Company 4"

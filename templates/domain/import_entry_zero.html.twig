@@ -1,0 +1,80 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}TLS Monitor – Entry Zero Import{% endblock %}
+
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2><i class="bi bi-upload"></i> Entry Zero Import</h2>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <p class="text-muted">
+                    Laden Sie eine CSV-Datei im <strong>Entry Zero Format</strong> hoch.
+                    Es werden alle Einträge aus der Spalte <strong>Subdomains</strong> importiert –
+                    sowohl einzelne Domains als auch JSON-Arrays mit mehreren Einträgen.<br>
+                    Jede importierte Domain erhält automatisch Port <strong>443</strong> (HTTPS) und Status <strong>aktiv</strong>.<br>
+                    Der Firmenname aus der Spalte <strong>Company</strong> wird als Beschreibung übernommen.<br>
+                    Bereits vorhandene Domains (gleiche FQDN + Port 443) werden aktualisiert, neue werden angelegt.<br>
+                    Erwartete Spalten: <code>Main Domain, Subdomains Count, Subdomains, Country, Company</code>
+                </p>
+
+                <form method="POST" action="{{ path('domain_import_entry_zero') }}" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">CSV-Datei <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" id="csv_file" name="csv_file"
+                               accept=".csv,text/csv" required>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> Importieren
+                        </button>
+                        <a href="{{ path('domain_index') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-lg"></i> Abbrechen
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if results is not null %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <strong><i class="bi bi-bar-chart"></i> Import-Ergebnis</strong>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li><i class="bi bi-plus-circle text-success"></i> Neu angelegt: <strong>{{ results.created }}</strong></li>
+                        <li><i class="bi bi-pencil text-primary"></i> Aktualisiert: <strong>{{ results.updated }}</strong></li>
+                        {% if results.skipped is not empty %}
+                            <li class="mt-2"><i class="bi bi-dash-circle text-warning"></i> Nicht erreichbar (übersprungen): <strong>{{ results.skipped|length }}</strong></li>
+                            <ul class="mt-1">
+                                {% for fqdn in results.skipped %}
+                                    <li class="text-warning small"><i class="bi bi-wifi-off"></i> {{ fqdn }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                        {% if results.errors is not empty %}
+                            <li class="mt-2"><i class="bi bi-exclamation-triangle text-danger"></i> Fehler: <strong>{{ results.errors|length }}</strong></li>
+                            <ul class="mt-1">
+                                {% for error in results.errors %}
+                                    <li class="text-danger small">{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            {% if results.created > 0 or results.updated > 0 %}
+                <div class="mt-3">
+                    <a href="{{ path('domain_index') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-list-ul"></i> Zur Domain-Liste
+                    </a>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
