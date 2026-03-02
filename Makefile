@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs shell clean ps scan create-user test test-unit test-integration test-coverage lint test-e2e test-e2e-setup
+.PHONY: help build up down restart logs shell clean ps scan scan-force import-entry-zero create-user test test-unit test-integration test-coverage lint test-e2e test-e2e-setup
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Befehle:"
@@ -49,6 +49,16 @@ scan: ## Führt einen manuellen Scan aus
 
 scan-force: ## Führt einen manuellen Scan aus (erzwingt Scan auch wenn heute bereits erfolgreich)
 	docker compose exec tls-monitor php /var/www/html/bin/console app:scan --force
+
+import-entry-zero: ## Entry Zero CSV importieren (Übergabe: FILE=/pfad/zur/datei.csv [DRYRUN=1])
+	@if [ -z "$(FILE)" ]; then \
+		echo "Fehler: FILE=/pfad/zur/datei.csv muss angegeben werden"; exit 1; \
+	fi
+	@if [ -n "$(DRYRUN)" ]; then \
+		docker compose exec tls-monitor php /var/www/html/bin/console app:import-entry-zero "/var/www/html/$(FILE)" --dry-run; \
+	else \
+		docker compose exec tls-monitor php /var/www/html/bin/console app:import-entry-zero "/var/www/html/$(FILE)"; \
+	fi
 
 create-user: ## Erstellt einen neuen Benutzer (Übergabe: USERNAME=user PASSWORD=pass [ROLE=admin|auditor])
 	@if [ -n "$(USERNAME)" ] && [ -n "$(PASSWORD)" ]; then \

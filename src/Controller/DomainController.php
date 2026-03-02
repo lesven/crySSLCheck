@@ -6,7 +6,9 @@ use App\Entity\Domain;
 use App\Enum\DomainStatus;
 use App\Repository\DomainRepository;
 use App\Service\MailService;
+use App\Service\TlsConnectorInterface;
 use App\Service\ValidationService;
+use App\ValueObject\ScanConfiguration;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -23,6 +25,8 @@ class DomainController extends AbstractController
         private readonly DomainRepository $domainRepository,
         private readonly ValidationService $validationService,
         private readonly MailService $mailService,
+        private readonly TlsConnectorInterface $tlsConnector,
+        private readonly ScanConfiguration $scanConfiguration,
         private readonly int $domainsPerPage = 25,
     ) {
     }
@@ -329,5 +333,127 @@ class DomainController extends AbstractController
 
         $this->addFlash('success', 'Alle Domains wurden erfolgreich gelöscht.');
         return $this->redirectToRoute('domain_index');
+    }
+
+    #[Route('/import-entry-zero', name: 'domain_import_entry_zero', methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    public function importEntryZero(Request $request): Response
+    {
+        $results = null;
+
+        if ($request->isMethod('POST')) {
+            $file = $request->files->get('csv_file');
+
+            if (!$file || !$file->isValid()) {
+                $this->addFlash('danger', 'Bitte eine gültige CSV-Datei hochladen.');
+                return $this->redirectToRoute('domain_import_entry_zero');
+            }
+
+            $results = ['created' => 0, 'updated' => 0, 'skipped' => [], 'errors' => []];
+            $handle  = fopen($file->getPathname(), 'r');
+
+            if ($handle === false) {
+                $this->addFlash('danger', 'Datei konnte nicht gelesen werden.');
+                return $this->redirectToRoute('domain_import_entry_zero');
+            }
+
+            try {
+                $header = fgetcsv($handle, 0, ',', '"', '');
+                if ($header === false) {
+                    $this->addFlash('danger', 'CSV-Datei ist leer oder ungültig.');
+                    return $this->redirectToRoute('domain_import_entry_zero');
+                }
+
+                $header = array_map(fn (string $h) => strtolower(trim($h)), $header);
+
+                $subdomainsCol = array_search('subdomains', $header, true);
+                $companyCol    = array_search('company', $header, true);
+
+                if ($subdomainsCol === false) {
+                    $this->addFlash('danger', 'CSV muss mindestens die Spalte "Subdomains" enthalten.');
+                    return $this->redirectToRoute('domain_import_entry_zero');
+                }
+
+                $lineNumber = 1;
+                $batchCount = 0;
+
+                while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
+                    ++$lineNumber;
+
+                    if (empty(array_filter($row, fn ($v) => $v !== null && $v !== ''))) {
+                        continue;
+                    }
+
+                    $rawSubdomains = trim($row[$subdomainsCol] ?? '');
+                    if ($rawSubdomains === '') {
+                        $results['errors'][] = sprintf('Zeile %d: Spalte "Subdomains" ist leer.', $lineNumber);
+                        continue;
+                    }
+
+                    $company    = $companyCol !== false ? (trim($row[$companyCol] ?? '') ?: null) : null;
+                    $subdomains = self::parseSubdomains($rawSubdomains);
+
+                    foreach ($subdomains as $fqdn) {
+                        $fqdn = trim($fqdn);
+
+                        $validationErrors = $this->validationService->validateDomainForImport($fqdn, 443);
+                        if (!empty($validationErrors)) {
+                            $results['errors'][] = sprintf('Zeile %d (%s): %s', $lineNumber, $fqdn, implode(', ', $validationErrors));
+                            continue;
+                        }
+
+                        $tlsResult = $this->tlsConnector->connect($fqdn, 443, $this->scanConfiguration->scanTimeout);
+                        if ($tlsResult === null) {
+                            $results['skipped'][] = $fqdn;
+                            continue;
+                        }
+
+                        $existing = $this->domainRepository->findOneBy(['fqdn' => $fqdn, 'port' => 443]);
+                        if ($existing !== null) {
+                            $existing->setDescription($company);
+                            ++$results['updated'];
+                        } else {
+                            $domain = new Domain();
+                            $domain->setFqdn($fqdn);
+                            $domain->setPort(443);
+                            $domain->setDescription($company);
+                            $this->entityManager->persist($domain);
+                            ++$results['created'];
+                        }
+
+                        ++$batchCount;
+                        if ($batchCount % 50 === 0) {
+                            $this->entityManager->flush();
+                            $this->entityManager->clear();
+                        }
+                    }
+                }
+            } finally {
+                fclose($handle);
+            }
+
+            $this->entityManager->flush();
+        }
+
+        return $this->render('domain/import_entry_zero.html.twig', [
+            'results' => $results,
+        ]);
+    }
+
+    /**
+     * Parses the Subdomains column value from an Entry Zero CSV row.
+     * Handles both JSON arrays (["a.example.de","b.example.de"]) and
+     * plain single-value strings ("www.example.de").
+     *
+     * @return array<int, string>
+     */
+    private static function parseSubdomains(string $value): array
+    {
+        $decoded = json_decode($value, true);
+        if (is_array($decoded)) {
+            return array_values(array_filter(array_map('strval', $decoded)));
+        }
+
+        return [$value];
     }
 }

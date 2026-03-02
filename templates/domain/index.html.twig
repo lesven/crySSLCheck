@@ -13,6 +13,9 @@
             <a href="{{ path('domain_import') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-upload"></i> CSV Import
             </a>
+            <a href="{{ path('domain_import_entry_zero') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-arrow-up"></i> Entry Zero Import
+            </a>
             <button type="button"
                     class="btn btn-outline-{{ mailer_configured ? 'success' : 'warning' }}"
                     data-bs-toggle="modal" data-bs-target="#mailTestModal"
