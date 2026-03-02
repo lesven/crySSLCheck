@@ -1,16 +1,12 @@
 {
-  "browsers": ["chrome:headless"],
+  "browsers": ["chromium:headless"],
   "src": "tests/**/*.test.js",
-  "baseUrl": "http://localhost:8000",
+  "baseUrl": "http://localhost:8443",
   "screenshotsOnFails": true,
   "screenshots": {
     "path": "screenshots",
     "takeOnFails": true,
     "pathPattern": "${DATE}_${TIME}/${FIXTURE}/${TEST_INDEX}/${FILE_INDEX}.png"
-  },
-  "videoPath": "videos",
-  "videoOptions": {
-    "failedOnly": true
   },
   "pageLoadTimeout": 10000,
   "selectorTimeout": 8000,

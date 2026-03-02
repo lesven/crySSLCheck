@@ -57,7 +57,8 @@ test('Admin kann neuen Benutzer anlegen', async t => {
         .typeText('#username', NEW_USER.username, { replace: true })
         .typeText('#password', NEW_USER.password, { replace: true })
         .typeText('#email', NEW_USER.email, { replace: true })
-        .click(`input[type="radio"][value="${NEW_USER.role}"]`)
+        .click('#role')
+        .click(Selector('#role option').withAttribute('value', NEW_USER.role))
         .click('[type="submit"]');
 
     // Weiterleitung auf Benutzerliste erwartet
@@ -139,12 +140,11 @@ fixture('Benutzerverwaltung – Auditor (kein Zugriff)')
 test('Auditor kann Benutzerverwaltung nicht aufrufen', async t => {
     await t.navigateTo(USERS_URL);
 
-    const currentUrl = await t.eval(() => window.location.pathname);
-
-    // Entweder Redirect oder Access Denied – auf jeden Fall nicht auf /admin/users
+    // Symfony zeigt bei fehlender Berechtigung eine 403-Seite (Access Denied),
+    // die URL bleibt dabei /admin/users – deshalb prüfen wir den Seiteninhalt.
     await t
-        .expect(currentUrl).notEql('/admin/users', 'Auditor sollte nicht auf /admin/users gelangen')
-        .expect(Selector('h2').withText('Benutzerverwaltung').exists).notOk('Auditor sieht Benutzerverwaltung');
+        .expect(Selector('h2').withText('Benutzerverwaltung').exists).notOk('Auditor sieht Benutzerverwaltung')
+        .expect(Selector('a').withText('Benutzer anlegen').exists).notOk('Auditor sieht den Benutzer-anlegen-Link');
 });
 
 test('Auditor kann /admin/users/new nicht aufrufen', async t => {

@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs shell clean ps scan create-user test test-unit test-integration test-coverage lint
+.PHONY: help build up down restart logs shell clean ps scan create-user test test-unit test-integration test-coverage lint test-e2e test-e2e-setup
 
 help: ## Zeigt diese Hilfe an
 	@echo "Verfügbare Befehle:"
@@ -100,3 +100,10 @@ lint: ## Führt PHPStan statische Analyse aus
 
 insights: ## Führt PHPInsights Code-Quality-Analyse aus
 	docker compose exec tls-monitor php -d memory_limit=1G /var/www/html/vendor/bin/phpinsights analyse src --no-interaction --disable-security-check --composer /var/www/html/composer.lock
+
+test-e2e-setup: ## Installiert E2E-Abhängigkeiten und lädt Fixtures
+	cd e2e && npm install
+	docker compose exec tls-monitor php /var/www/html/bin/console doctrine:fixtures:load --no-interaction
+
+test-e2e: ## Führt E2E-Tests aus (Container muss laufen, vorher: make test-e2e-setup)
+	cd e2e && npx testcafe chrome:headless tests/

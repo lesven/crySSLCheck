@@ -48,9 +48,9 @@ test('Admin kann neue Domain anlegen', async t => {
     await t.navigateTo(`${BASE_URL}/domains/new`);
 
     await t
-        .typeText('#domain_fqdn', NEW_DOMAIN.fqdn, { replace: true })
-        .typeText('#domain_port', NEW_DOMAIN.port, { replace: true })
-        .typeText('#domain_description', NEW_DOMAIN.description, { replace: true })
+        .typeText('#fqdn', NEW_DOMAIN.fqdn, { replace: true })
+        .typeText('#port', NEW_DOMAIN.port, { replace: true })
+        .typeText('#description', NEW_DOMAIN.description, { replace: true })
         .click('[type="submit"]');
 
     // Nach dem Speichern landen wir auf der Domain-Liste
@@ -70,7 +70,7 @@ test('Admin kann eine Domain bearbeiten', async t => {
         .click(editBtn);
 
     // Beschreibung ändern
-    const descField = Selector('#domain_description');
+    const descField = Selector('#description');
     await t
         .selectText(descField)
         .typeText(descField, 'Aktualisiert durch E2E-Test', { replace: true })
@@ -110,8 +110,8 @@ test('Admin kann eine Domain löschen', async t => {
     // Zuerst Testdomain anlegen, damit wir sie löschen können
     await t.navigateTo(`${BASE_URL}/domains/new`);
     await t
-        .typeText('#domain_fqdn', 'delete-me.e2e.test', { replace: true })
-        .typeText('#domain_port', '443', { replace: true })
+        .typeText('#fqdn', 'delete-me.e2e.test', { replace: true })
+        .typeText('#port', '443', { replace: true })
         .click('[type="submit"]');
 
     // Warten bis Domain in der Liste sichtbar ist
@@ -177,6 +177,6 @@ test('Auditor wird bei direktem Aufruf von /domains/new weitergeleitet', async t
     await t.navigateTo(`${BASE_URL}/domains/new`);
 
     // Sollte auf Domains-Liste oder Fehlermeldung landen, nicht auf dem Formular
-    const formExists = Selector('form #domain_fqdn').exists;
+    const formExists = Selector('form #fqdn').exists;
     await t.expect(formExists).notOk('Auditor darf das Domain-Formular nicht sehen');
 });

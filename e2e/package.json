@@ -4,13 +4,13 @@
   "description": "E2E tests for crySSLCheck / TLS Monitor using TestCafe",
   "private": true,
   "scripts": {
-    "test": "testcafe chrome tests/",
-    "test:headless": "testcafe chrome:headless tests/",
+    "test": "testcafe chromium tests/",
+    "test:headless": "testcafe chromium:headless tests/",
     "test:firefox": "testcafe firefox tests/",
-    "test:login": "testcafe chrome:headless tests/login.test.js",
-    "test:domains": "testcafe chrome:headless tests/domains.test.js",
-    "test:findings": "testcafe chrome:headless tests/findings.test.js",
-    "test:users": "testcafe chrome:headless tests/users.test.js"
+    "test:login": "testcafe chromium:headless tests/login.test.js",
+    "test:domains": "testcafe chromium:headless tests/domains.test.js",
+    "test:findings": "testcafe chromium:headless tests/findings.test.js",
+    "test:users": "testcafe chromium:headless tests/users.test.js"
   },
   "devDependencies": {
     "testcafe": "^3.7.0"

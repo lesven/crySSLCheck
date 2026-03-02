@@ -7,7 +7,7 @@
 
 const users = require('../fixtures/users.json');
 
-const BASE_URL = process.env.APP_URL || 'http://localhost:8000';
+const BASE_URL = process.env.APP_URL || 'http://localhost:8443';
 
 /**
  * Login with given credentials.
