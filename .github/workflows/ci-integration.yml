@@ -107,7 +107,7 @@ jobs:
           mkdir -p var/coverage
           php vendor/bin/phpunit --coverage-clover var/coverage/clover.xml
 
-      - name: Check PHP coverage threshold (69%)
+      - name: Check PHP coverage threshold (70%)
         run: |
           php -r '
           $xml = simplexml_load_file("var/coverage/clover.xml");
@@ -117,7 +117,7 @@ jobs:
           if ($total === 0) { echo "No statements found\n"; exit(0); }
           $rate = round($covered / $total * 100, 1);
           echo "PHP Coverage: " . $rate . "%\n";
-          if ($rate < 69) { echo "Coverage below 69% threshold!\n"; exit(1); }
+          if ($rate < 70) { echo "Coverage below 70% threshold!\n"; exit(1); }
           echo "Coverage OK\n";
           '
 
