@@ -1,0 +1,76 @@
+name: CI E2E
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches:
+      - 'release/**'
+      - 'hotfix/**'
+      - main
+
+jobs:
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install npm dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Start Docker Compose stack
+        run: docker compose up -d --build
+
+      - name: Install Composer dependencies
+        run: docker compose exec -T tls-monitor composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run migrations
+        run: docker compose exec -T tls-monitor php bin/console doctrine:migrations:migrate --no-interaction
+
+      - name: Load fixtures
+        run: docker compose exec -T tls-monitor php bin/console doctrine:fixtures:load --no-interaction
+
+      - name: Wait for web server
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8443 > /dev/null 2>&1; then
+              echo "Web server is ready"
+              break
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run TestCafe E2E tests
+        working-directory: e2e
+        run: |
+          mkdir -p ../var/coverage/screenshots
+          npx testcafe "chrome:headless" tests/ --skip-js-errors \
+            --screenshots path=../var/coverage/screenshots,takeOnFails=true
+
+      - name: Upload screenshots on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-screenshots
+          path: var/coverage/screenshots
+          retention-days: 30
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build .
