@@ -22,6 +22,10 @@
                             <div class="alert alert-danger">
                                 {{ error.messageKey|trans(error.messageData, 'security') }}
                             </div>
+                        {% elseif app.request.query.get('invalid') %}
+                            <div class="alert alert-danger">
+                                {{ 'Invalid credentials.'|trans({}, 'security') }}
+                            </div>
                         {% endif %}
 
                         <form method="POST" action="{{ path('security_login') }}">
