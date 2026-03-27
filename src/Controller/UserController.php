@@ -107,7 +107,7 @@ class UserController extends AbstractController
         $email = $user->getEmail();
 
         if ($request->isMethod('POST')) {
-            if (!$this->isCsrfTokenValid('user_edit_' . $id, $request->request->get('_token'))) {
+            if (!$this->isCsrfTokenValid('user_edit', $request->request->get('_token'))) {
                 $errors[] = 'Ungültiges CSRF-Token.';
             } else {
                 $username = trim($request->request->get('username', ''));
@@ -176,7 +176,7 @@ class UserController extends AbstractController
             throw $this->createNotFoundException('Benutzer nicht gefunden.');
         }
 
-        if (!$this->isCsrfTokenValid('delete-user-' . $id, $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('user_delete', $request->request->get('_token'))) {
             $this->addFlash('error', 'Ungültiges CSRF-Token.');
             return $this->redirectToRoute('user_index');
         }

@@ -9,3 +9,7 @@ framework:
             - submit
             - authenticate
             - logout
+            - user_new
+            - user_edit
+            - user_delete
+            - change-password
