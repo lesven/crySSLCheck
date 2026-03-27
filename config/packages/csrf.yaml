@@ -1,4 +1,7 @@
-# Enable stateless CSRF protection for forms and logins/logouts
+# Enable stateless CSRF protection only for tokens that are not validated
+# via isCsrfTokenValid() in controllers. Tokens used in controller forms
+# (user_new, user_edit, user_delete, change-password) must use session-based
+# storage to ensure CSRF validation works correctly through TestCafe's proxy.
 framework:
     form:
         csrf_protection:
@@ -7,9 +10,4 @@ framework:
     csrf_protection:
         stateless_token_ids:
             - submit
-            - authenticate
             - logout
-            - user_new
-            - user_edit
-            - user_delete
-            - change-password
