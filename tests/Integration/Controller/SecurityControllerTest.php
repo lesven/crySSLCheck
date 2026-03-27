@@ -88,7 +88,7 @@ class SecurityControllerTest extends WebTestCase
 
         $client->submit($form);
 
-        $this->assertResponseRedirects('/login');
+        $this->assertResponseRedirects('/login?invalid=1');
         $client->followRedirect();
         $this->assertSelectorExists('.alert-danger, .error');
     }
