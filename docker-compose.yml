@@ -22,7 +22,7 @@ services:
     environment:
       # Feste Werte – werden nicht durch env_file überschrieben
       - TZ=Europe/Berlin
-      - APP_ENV=dev
+      - APP_ENV=${APP_ENV:-dev}
       - APP_DEBUG=1
       # Absoluter Pfad im Container überschreibt den relativen %kernel.project_dir%-Pfad aus env_file
       - DATABASE_URL=sqlite:////var/www/html/data/tls_monitor.sqlite

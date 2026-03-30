@@ -46,8 +46,10 @@ test('Auditor kann sich einloggen und landet auf der Domain-Liste', async t => {
 test('Login mit falschen Zugangsdaten zeigt Fehlermeldung', async t => {
     await loginWith(t, users.invalid.username, users.invalid.password);
 
+    // CI headless Chrome can be slow to complete the POST → 302 → GET redirect
+    // chain after a failed login; give the assertion a generous timeout.
     await t
-        .expect(Selector('.alert-danger').exists).ok('Fehlermeldung bei falschem Login fehlt')
+        .expect(Selector('.alert-danger').exists).ok('Fehlermeldung bei falschem Login fehlt', { timeout: 15000 })
         .expect(Selector('.alert-danger').innerText).contains('Invalid credentials', 'Fehlermeldungstext passt nicht');
 });
 
