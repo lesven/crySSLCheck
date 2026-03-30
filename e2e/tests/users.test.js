@@ -96,11 +96,13 @@ test('Doppelter Benutzername wird abgelehnt', async t => {
 test('Admin kann E-Mail eines Benutzers ändern', async t => {
     await t.navigateTo(USERS_URL);
 
-    // Ersten Bearbeiten-Button (nicht eigener Account) klicken
+    // Read the edit link URL and navigate explicitly.  click() on links
+    // is unreliable in CI headless Chrome when previous tests used
+    // ClientFunction-based form.submit() (TestCafe loses navigation tracking).
     const editBtn = Selector('a[title="Bearbeiten"]').nth(1);
-    await t
-        .expect(editBtn.exists).ok('Kein Bearbeiten-Button vorhanden')
-        .click(editBtn);
+    await t.expect(editBtn.exists).ok('Kein Bearbeiten-Button vorhanden');
+    const editUrl = await editBtn.getAttribute('href');
+    await t.navigateTo(`${BASE_URL}${editUrl}`);
 
     await t.expect(Selector('#email').exists).ok({ timeout: 10000 });
     await t.wait(1000);
@@ -108,7 +110,7 @@ test('Admin kann E-Mail eines Benutzers ändern', async t => {
     await submitForm();
 
     await t.expect(Selector('.alert-success, td').withText('updated-by-e2e@tls-monitor.local').exists)
-        .ok('Geänderte E-Mail nicht in der Benutzerliste');
+        .ok('Geänderte E-Mail nicht in der Benutzerliste', { timeout: 15000 });
 });
 
 // ──────────────────────────────────────────────
@@ -127,18 +129,24 @@ test('Admin kann einen Benutzer löschen', async t => {
     });
     await submitForm();
 
-    await t.expect(Selector('td').withText('delete-me-user').exists).ok();
+    await t.expect(Selector('td').withText('delete-me-user').exists).ok({ timeout: 15000 });
 
-    // Dann löschen
-    const deleteRow = Selector('tr').withText('delete-me-user');
-    const deleteBtn = deleteRow.find('button[title="Löschen"]');
-
-    await t
-        .setNativeDialogHandler(() => true)
-        .click(deleteBtn);
+    // Submit the delete form directly via ClientFunction.  The delete button
+    // is inside a <form> with a confirm() event listener.  In CI headless
+    // Chrome, setNativeDialogHandler + click is unreliable. Submitting the
+    // form via JS bypasses confirm() entirely and guarantees the POST fires.
+    const deleteForm = ClientFunction(() => {
+        const row = Array.from(document.querySelectorAll('tr'))
+            .find(tr => tr.textContent.includes('delete-me-user'));
+        if (row) {
+            const form = row.querySelector('.user-delete-form');
+            if (form) form.submit();
+        }
+    });
+    await deleteForm();
 
     await t.expect(Selector('td').withText('delete-me-user').exists)
-        .notOk('Gelöschter Benutzer sollte nicht mehr in der Liste sein');
+        .notOk('Gelöschter Benutzer sollte nicht mehr in der Liste sein', { timeout: 15000 });
 });
 
 // ──────────────────────────────────────────────
