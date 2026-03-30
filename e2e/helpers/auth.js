@@ -8,7 +8,7 @@
  * Uses fixture data from fixtures/users.json.
  */
 
-const { Role, Selector } = require('testcafe');
+const { Role, Selector, ClientFunction } = require('testcafe');
 const users = require('../fixtures/users.json');
 
 const BASE_URL = process.env.APP_URL || 'http://localhost:8443';
@@ -62,21 +62,28 @@ async function loginAsAuditor(t) {
  * @param {string} password
  */
 async function loginWith(t, username, password) {
-    // Clear the session without triggering any navigation. useRole(anonymous)
-    // internally navigates to about:blank and back, which causes a race condition
-    // in CI headless Chrome: the "navigate back" can finish *after* typeText has
-    // already filled the form, wiping the typed text. deleteCookies() avoids
-    // this by only clearing cookies – no page load at all.
+    // Clear any existing session, then navigate to a fresh login page.
     await t.deleteCookies();
     await t.navigateTo(`${BASE_URL}/login`);
 
     const usernameInput = Selector('#username');
     await t.expect(usernameInput.exists).ok({ timeout: 10000 });
 
-    await t
-        .typeText(usernameInput, username, { replace: true })
-        .typeText('#password', password, { replace: true })
-        .click('[type="submit"]');
+    // Set form values directly in the DOM via ClientFunction instead of
+    // typeText.  On CI headless Chrome, typeText is prone to a race condition
+    // where late-loading CDN resources (Bootstrap CSS/JS) trigger a re-layout
+    // or soft page refresh that clears already-typed text.  ClientFunction
+    // executes synchronously in the browser context after the page is stable,
+    // so the values stick reliably.
+    const fillForm = ClientFunction((u, p) => {
+        document.getElementById('username').value = u;
+        document.getElementById('password').value = p;
+    });
+    await fillForm(username, password);
+
+    // Submit the form via button click (HTML5 required validation passes
+    // because the values are already set).
+    await t.click('[type="submit"]');
 }
 
 /**
