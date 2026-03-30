@@ -8,7 +8,7 @@
  * Uses fixture data from fixtures/users.json.
  */
 
-const { Role } = require('testcafe');
+const { Role, Selector } = require('testcafe');
 const users = require('../fixtures/users.json');
 
 const BASE_URL = process.env.APP_URL || 'http://localhost:8443';
