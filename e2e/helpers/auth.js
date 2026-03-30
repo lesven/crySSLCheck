@@ -125,4 +125,17 @@ const fillFields = ClientFunction((fields) => {
     }
 });
 
-module.exports = { loginWith, loginAsAdmin, loginAsAuditor, logout, fillFields, users, BASE_URL };
+/**
+ * Submit the first form on the page via JavaScript.
+ *
+ * In CI headless Chrome, TestCafe's click() on a submit button after
+ * ClientFunction-based field filling is unreliable — the click either
+ * doesn't register or triggers before the DOM state is fully committed.
+ * form.submit() called from a ClientFunction is synchronous and bypasses
+ * HTML5 constraint validation, guaranteeing the POST is sent.
+ */
+const submitForm = ClientFunction(() => {
+    document.querySelector('form').submit();
+});
+
+module.exports = { loginWith, loginAsAdmin, loginAsAuditor, logout, fillFields, submitForm, users, BASE_URL };

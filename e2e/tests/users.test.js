@@ -11,7 +11,7 @@
  */
 
 import { Selector, ClientFunction } from 'testcafe';
-import { loginAsAdmin, loginAsAuditor, fillFields, BASE_URL } from '../helpers/auth';
+import { loginAsAdmin, loginAsAuditor, fillFields, submitForm, BASE_URL } from '../helpers/auth';
 
 const USERS_URL = `${BASE_URL}/admin/users`;
 const NEW_USER = {
@@ -66,10 +66,7 @@ test('Admin kann neuen Benutzer anlegen', async t => {
     });
     await setRole(NEW_USER.role);
 
-    const submitBtn = Selector('[type="submit"]');
-    await t
-        .scrollIntoView(submitBtn)
-        .click(submitBtn);
+    await submitForm();
 
     // Weiterleitung auf Benutzerliste erwartet
     await t
@@ -88,7 +85,7 @@ test('Doppelter Benutzername wird abgelehnt', async t => {
         '#password': 'somePassword123',
         '#email':    'duplicate@example.com',
     });
-    await t.click('[type="submit"]');
+    await submitForm();
 
     await t.expect(Selector('.alert-danger').exists).ok('Keine Fehlermeldung bei doppeltem Benutzernamen');
 });
@@ -108,7 +105,7 @@ test('Admin kann E-Mail eines Benutzers ändern', async t => {
     await t.expect(Selector('#email').exists).ok({ timeout: 10000 });
     await t.wait(1000);
     await fillFields({ '#email': 'updated-by-e2e@tls-monitor.local' });
-    await t.click('[type="submit"]');
+    await submitForm();
 
     await t.expect(Selector('.alert-success, td').withText('updated-by-e2e@tls-monitor.local').exists)
         .ok('Geänderte E-Mail nicht in der Benutzerliste');
@@ -128,10 +125,7 @@ test('Admin kann einen Benutzer löschen', async t => {
         '#password': 'DeleteMe!123',
         '#email':    'deleteme@tls-monitor.local',
     });
-    const submitBtn = Selector('[type="submit"]');
-    await t
-        .scrollIntoView(submitBtn)
-        .click(submitBtn);
+    await submitForm();
 
     await t.expect(Selector('td').withText('delete-me-user').exists).ok();
 
