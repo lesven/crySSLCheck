@@ -317,6 +317,12 @@ class DomainController extends AbstractController
         $this->entityManager->flush();
 
         $this->addFlash('success', 'Domain erfolgreich gelöscht.');
+
+        $returnUrl = $request->request->get('_return_url', '');
+        if (is_string($returnUrl) && str_starts_with($returnUrl, '/findings')) {
+            return $this->redirect($returnUrl);
+        }
+
         return $this->redirectToRoute('domain_index');
     }
 

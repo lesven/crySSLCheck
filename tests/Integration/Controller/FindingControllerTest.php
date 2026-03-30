@@ -264,4 +264,89 @@ class FindingControllerTest extends WebTestCase
         $this->assertStringContainsString('current_run=1', $content);
         $this->assertStringContainsString('page=2', $content);
     }
+
+    // ── Domain-Löschung von der Findings-Seite ────────────────────────────────
+
+    public function testDeleteButtonVisibleForAdmin(): void
+    {
+        $client = $this->buildClient();
+        $this->loginUser($client, 'admin');
+        $this->createDomainAndFindings(1, 'CERT_EXPIRY');
+
+        $client->request('GET', '/findings');
+        $this->assertResponseIsSuccessful();
+
+        $crawler = $client->getCrawler();
+        $this->assertGreaterThan(
+            0,
+            $crawler->filter('form.domain-delete-form')->count(),
+            'Admin muss mindestens einen Lösch-Button in der Findings-Tabelle sehen.'
+        );
+    }
+
+    public function testDeleteButtonHiddenForAuditor(): void
+    {
+        $client = $this->buildClient();
+        $this->loginUser($client, 'auditor');
+        $this->createDomainAndFindings(1, 'CERT_EXPIRY');
+
+        $client->request('GET', '/findings');
+        $this->assertResponseIsSuccessful();
+
+        $crawler = $client->getCrawler();
+        $this->assertSame(
+            0,
+            $crawler->filter('form.domain-delete-form')->count(),
+            'Auditor darf keinen Lösch-Button in der Findings-Tabelle sehen.'
+        );
+    }
+
+    public function testDeleteDomainFromFindingsPageRedirectsBackToFindings(): void
+    {
+        $client = $this->buildClient();
+        $this->loginUser($client, 'admin');
+
+        // Domain mit 1 Finding anlegen
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+
+        $domain = new Domain();
+        $domain->setFqdn('delete-test.example.com');
+        $domain->setPort(443);
+        $em->persist($domain);
+
+        $scanRun = new ScanRun();
+        $scanRun->finish('success');
+        $em->persist($scanRun);
+
+        $finding = new Finding();
+        $finding->setDomain($domain);
+        $finding->setScanRun($scanRun);
+        $finding->setFindingType('CERT_EXPIRY');
+        $finding->setSeverity('high');
+        $finding->setStatus('new');
+        $finding->setDetails([]);
+        $em->persist($finding);
+        $em->flush();
+
+        $domainId = $domain->getId();
+
+        // CSRF-Token von der Findings-Seite holen
+        $crawler = $client->request('GET', '/findings');
+        $token   = $crawler->filter('form.domain-delete-form input[name="_token"]')->first()->attr('value');
+
+        $returnUrl = '/findings?search=delete-test';
+        $client->request('POST', '/domains/' . $domainId . '/delete', [
+            '_token'      => $token,
+            '_return_url' => $returnUrl,
+        ]);
+
+        $this->assertResponseRedirects($returnUrl);
+
+        // Domain und Finding müssen gelöscht sein
+        $em->clear();
+        $domainRepo  = $em->getRepository(Domain::class);
+        $findingRepo = $em->getRepository(Finding::class);
+        $this->assertNull($domainRepo->find($domainId));
+        $this->assertCount(0, $findingRepo->findAll());
+    }
 }

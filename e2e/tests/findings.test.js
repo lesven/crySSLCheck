@@ -89,3 +89,38 @@ test('Auditor kann Findings lesen', async t => {
         .expect(Selector('h2').withText('Findings').exists).ok('Auditor kann Findings-Seite nicht aufrufen')
         .expect(Selector('table').exists).ok('Findings-Tabelle für Auditor nicht sichtbar');
 });
+
+test('Auditor sieht keinen Lösch-Button in der Findings-Tabelle', async t => {
+    await t
+        .expect(Selector('form.domain-delete-form').exists).notOk('Auditor darf keinen Lösch-Button sehen');
+});
+
+// ──────────────────────────────────────────────
+// Admin: Domain direkt aus Findings löschen
+// ──────────────────────────────────────────────
+fixture('Findings – Domain löschen (Admin)')
+    .page(`${BASE_URL}/login`)
+    .beforeEach(async t => {
+        await loginAsAdmin(t);
+    });
+
+test('Admin kann Domain direkt aus der Findings-Tabelle löschen', async t => {
+    // Zunächst eine Domain anlegen, die anschließend gelöscht werden soll
+    const newFqdn = 'e2e-delete-test.example.com';
+
+    await t.navigateTo(`${BASE_URL}/domains/new`);
+    await t.wait(500);
+    await t
+        .typeText(Selector('#fqdn'), newFqdn)
+        .typeText(Selector('#port'), '443')
+        .click(Selector('button[type="submit"]'));
+    await t.wait(1000);
+
+    // Scan simulieren ist im E2E-Kontext nicht möglich, daher prüfen wir nur
+    // dass der Lösch-Button auf der Findings-Seite für Admins grundsätzlich sichtbar ist
+    await t.navigateTo(`${BASE_URL}/findings`);
+    await t.wait(1000);
+
+    await t
+        .expect(Selector('form.domain-delete-form').exists).ok('Lösch-Button für Admin in Findings-Tabelle nicht vorhanden');
+});
