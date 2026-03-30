@@ -14,14 +14,22 @@ const users = require('../fixtures/users.json');
 const BASE_URL = process.env.APP_URL || 'http://localhost:8443';
 
 /**
+ * Helper: fill login form and submit via ClientFunction (CI-safe).
+ */
+const fillLoginAndSubmit = ClientFunction((username, password) => {
+    document.getElementById('username').value = username;
+    document.getElementById('password').value = password;
+    document.querySelector('form').submit();
+});
+
+/**
  * TestCafe Role for the admin user.
  * Performs login once; subsequent useRole() calls restore the cached session.
  */
 const adminRole = Role(`${BASE_URL}/login`, async t => {
-    await t
-        .typeText('#username', users.admin.username, { replace: true })
-        .typeText('#password', users.admin.password, { replace: true })
-        .click('[type="submit"]');
+    await t.expect(Selector('#username').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
+    await fillLoginAndSubmit(users.admin.username, users.admin.password);
 });
 
 /**
@@ -29,10 +37,9 @@ const adminRole = Role(`${BASE_URL}/login`, async t => {
  * Performs login once; subsequent useRole() calls restore the cached session.
  */
 const auditorRole = Role(`${BASE_URL}/login`, async t => {
-    await t
-        .typeText('#username', users.auditor.username, { replace: true })
-        .typeText('#password', users.auditor.password, { replace: true })
-        .click('[type="submit"]');
+    await t.expect(Selector('#username').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
+    await fillLoginAndSubmit(users.auditor.username, users.auditor.password);
 });
 
 /**
