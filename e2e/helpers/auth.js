@@ -62,28 +62,40 @@ async function loginAsAuditor(t) {
  * @param {string} password
  */
 async function loginWith(t, username, password) {
-    // Clear any existing session, then navigate to a fresh login page.
-    await t.deleteCookies();
+    // Properly clear TestCafe's role system state so cached role cookies are
+    // not silently re-injected during subsequent actions.
+    await t.useRole(Role.anonymous());
     await t.navigateTo(`${BASE_URL}/login`);
 
+    // Wait for the login form to be present in the DOM.
     const usernameInput = Selector('#username');
     await t.expect(usernameInput.exists).ok({ timeout: 10000 });
 
-    // Set form values directly in the DOM via ClientFunction instead of
-    // typeText.  On CI headless Chrome, typeText is prone to a race condition
-    // where late-loading CDN resources (Bootstrap CSS/JS) trigger a re-layout
-    // or soft page refresh that clears already-typed text.  ClientFunction
-    // executes synchronously in the browser context after the page is stable,
-    // so the values stick reliably.
-    const fillForm = ClientFunction((u, p) => {
-        document.getElementById('username').value = u;
-        document.getElementById('password').value = p;
-    });
-    await fillForm(username, password);
+    // Extra stabilisation pause: in CI headless Chrome, useRole(anonymous) +
+    // navigateTo in quick succession can leave the page in a transitional state
+    // where the DOM is present but a pending navigation / re-render is about to
+    // replace it.  A short wait lets the browser settle.
+    await t.wait(2000);
+    // Re-verify the form is still there after the wait (catches late page reload).
+    await t.expect(usernameInput.exists).ok({ timeout: 5000 });
 
-    // Submit the form via button click (HTML5 required validation passes
-    // because the values are already set).
-    await t.click('[type="submit"]');
+    // Fill form values AND submit in a single synchronous JavaScript execution.
+    // This is the only approach that is immune to race conditions between
+    // "fill" and "submit" — there is zero time gap where a concurrent page
+    // navigation could wipe values.  form.submit() also bypasses HTML5
+    // constraint validation, so empty-value edge-cases cannot block the POST.
+    const fillAndSubmit = ClientFunction((u, p) => {
+        const form = document.querySelector('form');
+        form.querySelector('#username').value = u;
+        form.querySelector('#password').value = p;
+        form.submit();
+    });
+    await fillAndSubmit(username, password);
+
+    // form.submit() triggers a navigation that TestCafe may not automatically
+    // track (unlike click-triggered submissions).  Wait for the target page
+    // to fully load by checking for a known DOM element.
+    await t.expect(Selector('#username').exists).ok({ timeout: 15000 });
 }
 
 /**
