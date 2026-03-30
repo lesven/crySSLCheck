@@ -108,4 +108,21 @@ async function logout(t) {
     await t.useRole(Role.anonymous());
 }
 
-module.exports = { loginWith, loginAsAdmin, loginAsAuditor, logout, users, BASE_URL };
+/**
+ * Fill multiple form fields by setting their DOM values directly.
+ *
+ * On CI headless Chrome, TestCafe's typeText is unreliable on freshly
+ * navigated pages: late-loading CDN resources (Bootstrap CSS/JS) can trigger
+ * a re-render that clears already-typed text. Setting .value directly via
+ * ClientFunction is atomic and immune to this race condition.
+ *
+ * @param {Object<string, string>} fields  Mapping of CSS selector → value
+ */
+const fillFields = ClientFunction((fields) => {
+    for (const [selector, value] of Object.entries(fields)) {
+        const el = document.querySelector(selector);
+        if (el) el.value = value;
+    }
+});
+
+module.exports = { loginWith, loginAsAdmin, loginAsAuditor, logout, fillFields, users, BASE_URL };

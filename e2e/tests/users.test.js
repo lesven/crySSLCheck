@@ -10,8 +10,8 @@
  *  - Doppelter Benutzername wird abgelehnt
  */
 
-import { Selector } from 'testcafe';
-import { loginAsAdmin, loginAsAuditor, BASE_URL } from '../helpers/auth';
+import { Selector, ClientFunction } from 'testcafe';
+import { loginAsAdmin, loginAsAuditor, fillFields, BASE_URL } from '../helpers/auth';
 
 const USERS_URL = `${BASE_URL}/admin/users`;
 const NEW_USER = {
@@ -52,13 +52,22 @@ test('Rollen-Badges werden korrekt angezeigt', async t => {
 // ──────────────────────────────────────────────
 test('Admin kann neuen Benutzer anlegen', async t => {
     await t.navigateTo(`${USERS_URL}/new`);
+    await t.expect(Selector('#username').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
+
+    await fillFields({
+        '#username': NEW_USER.username,
+        '#password': NEW_USER.password,
+        '#email':    NEW_USER.email,
+    });
+    // Select role via native JS (ClientFunction-safe)
+    const setRole = ClientFunction((role) => {
+        document.querySelector('#role').value = role;
+    });
+    await setRole(NEW_USER.role);
+
     const submitBtn = Selector('[type="submit"]');
     await t
-        .typeText('#username', NEW_USER.username, { replace: true })
-        .typeText('#password', NEW_USER.password, { replace: true })
-        .typeText('#email', NEW_USER.email, { replace: true })
-        .click('#role')
-        .click(Selector('#role option').withAttribute('value', NEW_USER.role))
         .scrollIntoView(submitBtn)
         .click(submitBtn);
 
@@ -70,13 +79,16 @@ test('Admin kann neuen Benutzer anlegen', async t => {
 
 test('Doppelter Benutzername wird abgelehnt', async t => {
     await t.navigateTo(`${USERS_URL}/new`);
+    await t.expect(Selector('#username').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
 
     // 'admin' existiert bereits als Fixture
-    await t
-        .typeText('#username', 'admin', { replace: true })
-        .typeText('#password', 'somePassword123', { replace: true })
-        .typeText('#email', 'duplicate@example.com', { replace: true })
-        .click('[type="submit"]');
+    await fillFields({
+        '#username': 'admin',
+        '#password': 'somePassword123',
+        '#email':    'duplicate@example.com',
+    });
+    await t.click('[type="submit"]');
 
     await t.expect(Selector('.alert-danger').exists).ok('Keine Fehlermeldung bei doppeltem Benutzernamen');
 });
@@ -93,11 +105,10 @@ test('Admin kann E-Mail eines Benutzers ändern', async t => {
         .expect(editBtn.exists).ok('Kein Bearbeiten-Button vorhanden')
         .click(editBtn);
 
-    const emailField = Selector('#email');
-    await t
-        .selectText(emailField)
-        .typeText(emailField, 'updated-by-e2e@tls-monitor.local', { replace: true })
-        .click('[type="submit"]');
+    await t.expect(Selector('#email').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
+    await fillFields({ '#email': 'updated-by-e2e@tls-monitor.local' });
+    await t.click('[type="submit"]');
 
     await t.expect(Selector('.alert-success, td').withText('updated-by-e2e@tls-monitor.local').exists)
         .ok('Geänderte E-Mail nicht in der Benutzerliste');
@@ -109,11 +120,16 @@ test('Admin kann E-Mail eines Benutzers ändern', async t => {
 test('Admin kann einen Benutzer löschen', async t => {
     // Erst neuen Benutzer anlegen
     await t.navigateTo(`${USERS_URL}/new`);
+    await t.expect(Selector('#username').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
+
+    await fillFields({
+        '#username': 'delete-me-user',
+        '#password': 'DeleteMe!123',
+        '#email':    'deleteme@tls-monitor.local',
+    });
     const submitBtn = Selector('[type="submit"]');
     await t
-        .typeText('#username', 'delete-me-user', { replace: true })
-        .typeText('#password', 'DeleteMe!123', { replace: true })
-        .typeText('#email', 'deleteme@tls-monitor.local', { replace: true })
         .scrollIntoView(submitBtn)
         .click(submitBtn);
 
