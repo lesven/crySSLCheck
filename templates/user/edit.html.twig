@@ -18,7 +18,7 @@
         {% endif %}
 
         <form method="post" action="{{ path('user_edit', {id: user.id}) }}">
-            <input type="hidden" name="_token" value="{{ csrf_token('user_edit_' ~ user.id) }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('user_edit') }}">
 
             <div class="mb-3">
                 <label for="username" class="form-label">Benutzername</label>

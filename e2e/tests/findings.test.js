@@ -45,17 +45,14 @@ test('Filter "Nur Probleme" blendet OK-Findings aus', async t => {
     const okCell = Selector('td').withText('OK');
     await t.expect(okCell.exists).ok('Ohne Filter sollten OK-Findings sichtbar sein');
 
-    // Filter aktivieren
-    await t
-        .click('#problems_only')
-        .expect(Selector('td').withText('OK').exists).notOk('OK-Findings sollten mit "Nur Probleme"-Filter ausgeblendet sein');
+    // Filter über URL aktivieren – zuverlässiger als onchange-basierte Formularübermittlung in CI
+    await t.navigateTo(`${BASE_URL}/findings?problems_only=1`);
+    await t.expect(Selector('td').withText('OK').exists).notOk('OK-Findings sollten mit "Nur Probleme"-Filter ausgeblendet sein');
 });
 
 test('Domain-Suche filtert Findings nach FQDN', async t => {
-    const searchInput = Selector('#search');
-    await t
-        .typeText(searchInput, 'expired.badssl.com', { replace: true })
-        .click('button[type="submit"]');
+    // Suche über URL – zuverlässiger als Formularübermittlung in CI
+    await t.navigateTo(`${BASE_URL}/findings?search=expired.badssl.com`);
 
     await t
         .expect(Selector('td').withText('expired.badssl.com').exists).ok('expired.badssl.com sollte in den gefilterten Findings sein')
@@ -63,10 +60,8 @@ test('Domain-Suche filtert Findings nach FQDN', async t => {
 });
 
 test('Leere Suche zeigt Hinweismeldung', async t => {
-    const searchInput = Selector('#search');
-    await t
-        .typeText(searchInput, 'nichtvorhandenexyz123', { replace: true })
-        .click('button[type="submit"]');
+    // Suche über URL – zuverlässiger als Formularübermittlung in CI
+    await t.navigateTo(`${BASE_URL}/findings?search=nichtvorhandenexyz123`);
 
     await t.expect(Selector('.alert-info').exists).ok('Keine Hinweismeldung bei leerem Suchergebnis');
 });

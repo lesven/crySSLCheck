@@ -44,7 +44,7 @@
                                   action="{{ path('user_delete', {id: user.id}) }}"
                                   class="d-inline user-delete-form"
                                   data-username="{{ user.username }}">
-                                <input type="hidden" name="_token" value="{{ csrf_token('delete-user-' ~ user.id) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('user_delete') }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Löschen">
                                     <i class="bi bi-trash"></i>
                                 </button>

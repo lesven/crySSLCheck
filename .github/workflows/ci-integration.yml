@@ -1,0 +1,130 @@
+name: CI Integration
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches:
+      - develop
+      - 'release/**'
+      - 'hotfix/**'
+      - main
+
+jobs:
+  analyse:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: dev
+      APP_SECRET: changeme
+      DATABASE_URL: "sqlite:////tmp/tls_monitor_ci.sqlite"
+      MAILER_DSN: "null://null"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, openssl, ctype, iconv
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Warm up Symfony container
+        run: php bin/console cache:warmup --env=dev
+
+      - name: PHPStan
+        run: php -d memory_limit=512M vendor/bin/phpstan analyse
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: test
+      DATABASE_URL: "sqlite:///:memory:"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, openssl, ctype, iconv
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHPUnit Integration Suite
+        run: php vendor/bin/phpunit --testsuite Integration --no-coverage
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: test
+      DATABASE_URL: "sqlite:///:memory:"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, openssl, ctype, iconv
+          coverage: pcov
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHP Coverage
+        run: |
+          mkdir -p var/coverage
+          php vendor/bin/phpunit --coverage-clover var/coverage/clover.xml
+
+      - name: Check PHP coverage threshold (70%)
+        run: |
+          php -r '
+          $xml = simplexml_load_file("var/coverage/clover.xml");
+          $metrics = $xml->project->metrics;
+          $covered = (int)$metrics["coveredstatements"];
+          $total = (int)$metrics["statements"];
+          if ($total === 0) { echo "No statements found\n"; exit(0); }
+          $rate = round($covered / $total * 100, 1);
+          echo "PHP Coverage: " . $rate . "%\n";
+          if ($rate < 70) { echo "Coverage below 70% threshold!\n"; exit(1); }
+          echo "Coverage OK\n";
+          '
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: var/coverage/
+          retention-days: 30
