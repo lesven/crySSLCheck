@@ -63,7 +63,6 @@ services:
         arguments:
             $domainsPerPage: '%app.domains_per_page%'
 
-
     App\Service\ValidationService:
         arguments:
             $allowIpAddresses: '%app.allow_ip_addresses%'
@@ -73,3 +72,18 @@ services:
             $requestStack: '@request_stack'
         tags:
             - { name: data_collector, id: mailer, template: 'mail_collector.html.twig' }
+
+when@e2e:
+    services:
+        # Decorate the concrete CSRF manager so that all three injection points
+        # (Twig csrf_token(), AbstractController::isCsrfTokenValid() via
+        # security.csrf.token_manager, and the form_login listener) use the
+        # no-op implementation. security.csrf.token_manager is an alias that
+        # resolves to security.csrf.same_origin_token_manager, so we decorate
+        # the concrete service.
+        App\Security\NullCsrfTokenManager:
+            decorates: security.csrf.same_origin_token_manager
+
+        Symfony\Component\Security\Csrf\CsrfTokenManagerInterface:
+            alias: App\Security\NullCsrfTokenManager
+            public: true
