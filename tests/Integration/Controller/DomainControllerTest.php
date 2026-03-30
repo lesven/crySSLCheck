@@ -846,4 +846,51 @@ class DomainControllerTest extends WebTestCase
         $this->assertSelectorTextContains('body', 'Nicht erreichbar');
     }
 
+    public function testDeleteDomainFromFindingsRedirectsToFindings(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+        $domain = $this->createTestDomain('example.com', 443);
+        $domainId = $domain->getId();
+
+        $client->loginUser($user);
+
+        // Fetch a valid CSRF token via the domains list page
+        $crawler = $client->request('GET', '/domains');
+        $token   = $crawler->filter('form[action*="/delete"] input[name="_token"]')->first()->attr('value');
+
+        $returnUrl = '/findings?search=example&problems_only=1';
+        $client->request('POST', '/domains/' . $domainId . '/delete', [
+            '_token'      => $token,
+            '_return_url' => $returnUrl,
+        ]);
+
+        $this->assertResponseRedirects($returnUrl);
+
+        $em         = static::getContainer()->get(EntityManagerInterface::class);
+        $domainRepo = $em->getRepository(Domain::class);
+        $this->assertNull($domainRepo->find($domainId));
+    }
+
+    public function testDeleteDomainWithUntrustedReturnUrlFallsBackToDomainIndex(): void
+    {
+        $client = $this->buildClient();
+        $user   = $this->createTestUser('admin', 'admin');
+        $domain = $this->createTestDomain('example.com', 443);
+        $domainId = $domain->getId();
+
+        $client->loginUser($user);
+
+        $crawler = $client->request('GET', '/domains');
+        $token   = $crawler->filter('form[action*="/delete"] input[name="_token"]')->first()->attr('value');
+
+        $client->request('POST', '/domains/' . $domainId . '/delete', [
+            '_token'      => $token,
+            '_return_url' => 'https://evil.example.com/steal',
+        ]);
+
+        // Must fall back to /domains, not the external URL
+        $this->assertResponseRedirects('/domains');
+    }
+
 }
