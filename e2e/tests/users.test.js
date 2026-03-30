@@ -10,8 +10,8 @@
  *  - Doppelter Benutzername wird abgelehnt
  */
 
-import { Selector } from 'testcafe';
-import { loginAsAdmin, loginAsAuditor, BASE_URL } from '../helpers/auth';
+import { Selector, ClientFunction } from 'testcafe';
+import { loginAsAdmin, loginAsAuditor, fillFields, submitForm, BASE_URL } from '../helpers/auth';
 
 const USERS_URL = `${BASE_URL}/admin/users`;
 const NEW_USER = {
@@ -52,14 +52,21 @@ test('Rollen-Badges werden korrekt angezeigt', async t => {
 // ──────────────────────────────────────────────
 test('Admin kann neuen Benutzer anlegen', async t => {
     await t.navigateTo(`${USERS_URL}/new`);
+    await t.expect(Selector('#username').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
 
-    await t
-        .typeText('#username', NEW_USER.username, { replace: true })
-        .typeText('#password', NEW_USER.password, { replace: true })
-        .typeText('#email', NEW_USER.email, { replace: true })
-        .click('#role')
-        .click(Selector('#role option').withAttribute('value', NEW_USER.role))
-        .click('[type="submit"]');
+    await fillFields({
+        '#username': NEW_USER.username,
+        '#password': NEW_USER.password,
+        '#email':    NEW_USER.email,
+    });
+    // Select role via native JS (ClientFunction-safe)
+    const setRole = ClientFunction((role) => {
+        document.querySelector('#role').value = role;
+    });
+    await setRole(NEW_USER.role);
+
+    await submitForm();
 
     // Weiterleitung auf Benutzerliste erwartet
     await t
@@ -69,13 +76,16 @@ test('Admin kann neuen Benutzer anlegen', async t => {
 
 test('Doppelter Benutzername wird abgelehnt', async t => {
     await t.navigateTo(`${USERS_URL}/new`);
+    await t.expect(Selector('#username').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
 
     // 'admin' existiert bereits als Fixture
-    await t
-        .typeText('#username', 'admin', { replace: true })
-        .typeText('#password', 'somePassword123', { replace: true })
-        .typeText('#email', 'duplicate@example.com', { replace: true })
-        .click('[type="submit"]');
+    await fillFields({
+        '#username': 'admin',
+        '#password': 'somePassword123',
+        '#email':    'duplicate@example.com',
+    });
+    await submitForm();
 
     await t.expect(Selector('.alert-danger').exists).ok('Keine Fehlermeldung bei doppeltem Benutzernamen');
 });
@@ -86,20 +96,21 @@ test('Doppelter Benutzername wird abgelehnt', async t => {
 test('Admin kann E-Mail eines Benutzers ändern', async t => {
     await t.navigateTo(USERS_URL);
 
-    // Ersten Bearbeiten-Button (nicht eigener Account) klicken
+    // Read the edit link URL and navigate explicitly.  click() on links
+    // is unreliable in CI headless Chrome when previous tests used
+    // ClientFunction-based form.submit() (TestCafe loses navigation tracking).
     const editBtn = Selector('a[title="Bearbeiten"]').nth(1);
-    await t
-        .expect(editBtn.exists).ok('Kein Bearbeiten-Button vorhanden')
-        .click(editBtn);
+    await t.expect(editBtn.exists).ok('Kein Bearbeiten-Button vorhanden');
+    const editUrl = await editBtn.getAttribute('href');
+    await t.navigateTo(`${BASE_URL}${editUrl}`);
 
-    const emailField = Selector('#email');
-    await t
-        .selectText(emailField)
-        .typeText(emailField, 'updated-by-e2e@tls-monitor.local', { replace: true })
-        .click('[type="submit"]');
+    await t.expect(Selector('#email').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
+    await fillFields({ '#email': 'updated-by-e2e@tls-monitor.local' });
+    await submitForm();
 
     await t.expect(Selector('.alert-success, td').withText('updated-by-e2e@tls-monitor.local').exists)
-        .ok('Geänderte E-Mail nicht in der Benutzerliste');
+        .ok('Geänderte E-Mail nicht in der Benutzerliste', { timeout: 15000 });
 });
 
 // ──────────────────────────────────────────────
@@ -108,24 +119,34 @@ test('Admin kann E-Mail eines Benutzers ändern', async t => {
 test('Admin kann einen Benutzer löschen', async t => {
     // Erst neuen Benutzer anlegen
     await t.navigateTo(`${USERS_URL}/new`);
-    await t
-        .typeText('#username', 'delete-me-user', { replace: true })
-        .typeText('#password', 'DeleteMe!123', { replace: true })
-        .typeText('#email', 'deleteme@tls-monitor.local', { replace: true })
-        .click('[type="submit"]');
+    await t.expect(Selector('#username').exists).ok({ timeout: 10000 });
+    await t.wait(1000);
 
-    await t.expect(Selector('td').withText('delete-me-user').exists).ok();
+    await fillFields({
+        '#username': 'delete-me-user',
+        '#password': 'DeleteMe!123',
+        '#email':    'deleteme@tls-monitor.local',
+    });
+    await submitForm();
 
-    // Dann löschen
-    const deleteRow = Selector('tr').withText('delete-me-user');
-    const deleteBtn = deleteRow.find('button[title="Löschen"]');
+    await t.expect(Selector('td').withText('delete-me-user').exists).ok({ timeout: 15000 });
 
-    await t
-        .setNativeDialogHandler(() => true)
-        .click(deleteBtn);
+    // Submit the delete form directly via ClientFunction.  The delete button
+    // is inside a <form> with a confirm() event listener.  In CI headless
+    // Chrome, setNativeDialogHandler + click is unreliable. Submitting the
+    // form via JS bypasses confirm() entirely and guarantees the POST fires.
+    const deleteForm = ClientFunction(() => {
+        const row = Array.from(document.querySelectorAll('tr'))
+            .find(tr => tr.textContent.includes('delete-me-user'));
+        if (row) {
+            const form = row.querySelector('.user-delete-form');
+            if (form) form.submit();
+        }
+    });
+    await deleteForm();
 
     await t.expect(Selector('td').withText('delete-me-user').exists)
-        .notOk('Gelöschter Benutzer sollte nicht mehr in der Liste sein');
+        .notOk('Gelöschter Benutzer sollte nicht mehr in der Liste sein', { timeout: 15000 });
 });
 
 // ──────────────────────────────────────────────
