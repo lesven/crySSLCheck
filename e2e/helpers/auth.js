@@ -63,14 +63,16 @@ async function loginAsAuditor(t) {
  */
 async function loginWith(t, username, password) {
     await t.useRole(Role.anonymous());
-    // Navigate to the login page and wait until the form is actually rendered.
-    // In headless Chrome on CI, Role.anonymous() can take a moment to fully
-    // clear cookies; waiting for the #username input ensures the page is the
-    // real login form (not a redirect to /domains from a cached session).
-    await t.navigateTo(`${BASE_URL}/login`);
-    await t.expect(Selector('#username').exists).ok({ timeout: 5000 });
+    // useRole(anonymous) already navigates back to the fixture page URL.
+    // Do NOT call navigateTo('/login') again – the double navigation to the
+    // same URL causes a race condition in CI headless Chrome where the second
+    // page load wipes out text that was already typed into the form fields.
+    // Since all unauthenticated requests redirect to /login via access_control,
+    // we always end up on the login form regardless of the fixture page URL.
+    const usernameInput = Selector('#username');
+    await t.expect(usernameInput.exists).ok({ timeout: 10000 });
     await t
-        .typeText('#username', username, { replace: true })
+        .typeText(usernameInput, username, { replace: true })
         .typeText('#password', password, { replace: true })
         .click('[type="submit"]');
 }
