@@ -2,6 +2,7 @@ name: CI E2E
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  APP_ENV: e2e
 
 on:
   push:

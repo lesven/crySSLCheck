@@ -13,3 +13,9 @@ framework:
             - user_edit
             - user_delete
             - change-password
+
+when@e2e:
+    framework:
+        form:
+            csrf_protection: false
+        csrf_protection: false
