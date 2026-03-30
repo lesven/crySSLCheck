@@ -20,6 +20,10 @@ security:
                 password_parameter: password
                 default_target_path: domain_index
                 always_use_default_target_path: false
+                # Redirect to a distinct URL on failure so browser-based test tools
+                # (e.g. TestCafe) can detect the navigation and wait for the page
+                # to fully load before evaluating assertions.
+                failure_path: /login?invalid=1
             logout:
                 path: security_logout
                 target: security_login

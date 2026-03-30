@@ -9,13 +9,14 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Exception\BadCredentialsException;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
 
 class SecurityController extends AbstractController
 {
     #[Route('/login', name: 'security_login')]
-    public function login(AuthenticationUtils $authenticationUtils): Response
+    public function login(Request $request, AuthenticationUtils $authenticationUtils): Response
     {
         if ($this->getUser()) {
             return $this->redirectToRoute('domain_index');
@@ -23,6 +24,14 @@ class SecurityController extends AbstractController
 
         $error = $authenticationUtils->getLastAuthenticationError();
         $lastUsername = $authenticationUtils->getLastUsername();
+
+        // When the session error has already been consumed (e.g. after a proxy-based
+        // test tool that re-issues the GET request without the session cookie) but the
+        // failure_path redirect included ?invalid=1, fall back to a generic error so
+        // the .alert-danger element is always rendered for failed-login scenarios.
+        if ($error === null && $request->query->has('invalid')) {
+            $error = new BadCredentialsException('Invalid credentials.');
+        }
 
         return $this->render('security/login.html.twig', [
             'last_username' => $lastUsername,
