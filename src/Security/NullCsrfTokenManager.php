@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Security;
 
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
@@ -31,5 +32,10 @@ class NullCsrfTokenManager implements CsrfTokenManagerInterface
     public function isTokenValid(CsrfToken $token): bool
     {
         return true;
+    }
+
+    public function onKernelResponse(ResponseEvent $event): void
+    {
+        // No-op: CSRF cookies are not set in the e2e environment.
     }
 }

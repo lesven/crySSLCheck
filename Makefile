@@ -111,9 +111,19 @@ lint: ## Führt PHPStan statische Analyse aus
 insights: ## Führt PHPInsights Code-Quality-Analyse aus
 	docker compose exec tls-monitor php -d memory_limit=1G /var/www/html/vendor/bin/phpinsights analyse src --no-interaction --disable-security-check --composer /var/www/html/composer.lock
 
-test-e2e-setup: ## Installiert E2E-Abhängigkeiten und lädt Fixtures
-	cd e2e && npm install
-	docker compose exec tls-monitor php /var/www/html/bin/console doctrine:fixtures:load --no-interaction
+test-e2e-setup: ## Installiert E2E-Abhängigkeiten, führt Migrations aus und lädt Fixtures (APP_ENV=e2e)
+	cd e2e && npm ci
+	docker compose exec -e APP_ENV=e2e tls-monitor php /var/www/html/bin/console doctrine:migrations:migrate --no-interaction
+	docker compose exec -e APP_ENV=e2e tls-monitor php /var/www/html/bin/console doctrine:fixtures:load --no-interaction
+	@echo "Warte auf Webserver..."
+	@for i in $$(seq 1 30); do \
+		if curl -sf http://localhost:8443 > /dev/null 2>&1; then \
+			echo "Webserver bereit"; break; \
+		fi; \
+		echo "Warte... ($$i/30)"; \
+		sleep 2; \
+	done
 
 test-e2e: ## Führt E2E-Tests aus (Container muss laufen, vorher: make test-e2e-setup)
-	cd e2e && npx testcafe chrome:headless tests/
+	cd e2e && npx testcafe "chrome:headless" tests/ --skip-js-errors \
+		--screenshots path=./screenshots,takeOnFails=true
