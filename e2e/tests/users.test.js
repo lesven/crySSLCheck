@@ -52,14 +52,15 @@ test('Rollen-Badges werden korrekt angezeigt', async t => {
 // ──────────────────────────────────────────────
 test('Admin kann neuen Benutzer anlegen', async t => {
     await t.navigateTo(`${USERS_URL}/new`);
-
+    const submitBtn = Selector('[type="submit"]');
     await t
         .typeText('#username', NEW_USER.username, { replace: true })
         .typeText('#password', NEW_USER.password, { replace: true })
         .typeText('#email', NEW_USER.email, { replace: true })
         .click('#role')
         .click(Selector('#role option').withAttribute('value', NEW_USER.role))
-        .click('[type="submit"]');
+        .scrollIntoView(submitBtn)
+        .click(submitBtn);
 
     // Weiterleitung auf Benutzerliste erwartet
     await t
@@ -108,11 +109,13 @@ test('Admin kann E-Mail eines Benutzers ändern', async t => {
 test('Admin kann einen Benutzer löschen', async t => {
     // Erst neuen Benutzer anlegen
     await t.navigateTo(`${USERS_URL}/new`);
+    const submitBtn = Selector('[type="submit"]');
     await t
         .typeText('#username', 'delete-me-user', { replace: true })
         .typeText('#password', 'DeleteMe!123', { replace: true })
         .typeText('#email', 'deleteme@tls-monitor.local', { replace: true })
-        .click('[type="submit"]');
+        .scrollIntoView(submitBtn)
+        .click(submitBtn);
 
     await t.expect(Selector('td').withText('delete-me-user').exists).ok();
 
