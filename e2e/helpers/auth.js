@@ -62,15 +62,17 @@ async function loginAsAuditor(t) {
  * @param {string} password
  */
 async function loginWith(t, username, password) {
-    await t.useRole(Role.anonymous());
-    // useRole(anonymous) already navigates back to the fixture page URL.
-    // Do NOT call navigateTo('/login') again – the double navigation to the
-    // same URL causes a race condition in CI headless Chrome where the second
-    // page load wipes out text that was already typed into the form fields.
-    // Since all unauthenticated requests redirect to /login via access_control,
-    // we always end up on the login form regardless of the fixture page URL.
+    // Clear the session without triggering any navigation. useRole(anonymous)
+    // internally navigates to about:blank and back, which causes a race condition
+    // in CI headless Chrome: the "navigate back" can finish *after* typeText has
+    // already filled the form, wiping the typed text. deleteCookies() avoids
+    // this by only clearing cookies – no page load at all.
+    await t.deleteCookies();
+    await t.navigateTo(`${BASE_URL}/login`);
+
     const usernameInput = Selector('#username');
     await t.expect(usernameInput.exists).ok({ timeout: 10000 });
+
     await t
         .typeText(usernameInput, username, { replace: true })
         .typeText('#password', password, { replace: true })
