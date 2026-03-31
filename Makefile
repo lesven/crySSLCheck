@@ -85,7 +85,9 @@ install: ## Initialisiert das Projekt (Build + Up + Composer Install + Migration
 	make up
 	sleep 3
 	docker compose exec -e COMPOSER_MEMORY_LIMIT=-1 tls-monitor composer install --no-interaction
+	docker compose exec tls-monitor php /var/www/html/bin/console cache:warmup
 	docker compose exec tls-monitor php /var/www/html/bin/console doctrine:migrations:migrate --no-interaction
+	docker compose exec tls-monitor php /var/www/html/bin/console app:setup
 	@echo ""
 	@echo "Container gestartet!"
 	@echo "Anwendung läuft auf: http://localhost:8443"

@@ -34,14 +34,21 @@ if [ ! -d /var/www/html/vendor ] || [ -z "$(ls -A /var/www/html/vendor)" ]; then
     composer install --no-interaction --optimize-autoloader || true
 fi
 
-# Symfony Cache warmup
-php /var/www/html/bin/console cache:warmup --env="$APP_ENV" $DEBUG_FLAG
+# Symfony Cache warmup, Migrationen und Setup nur ausführen wenn vendor vorhanden ist.
+# Bei einem Erstdeploy kann vendor noch leer sein (leeres tls-vendor-Volume),
+# dann übernimmt "make install" diese Schritte nach dem composer install.
+if [ -d /var/www/html/vendor ] && [ -n "$(ls -A /var/www/html/vendor)" ]; then
+    # Symfony Cache warmup
+    php /var/www/html/bin/console cache:warmup --env="$APP_ENV" $DEBUG_FLAG
 
-# Datenbank-Migrationen ausführen
-php /var/www/html/bin/console doctrine:migrations:migrate --no-interaction --env="$APP_ENV"
+    # Datenbank-Migrationen ausführen
+    php /var/www/html/bin/console doctrine:migrations:migrate --no-interaction --env="$APP_ENV"
 
-# Standard-Admin-Benutzer anlegen falls noch keiner existiert
-php /var/www/html/bin/console app:setup --env="$APP_ENV"
+    # Standard-Admin-Benutzer anlegen falls noch keiner existiert
+    php /var/www/html/bin/console app:setup --env="$APP_ENV"
+else
+    echo "vendor/ nicht vorhanden – überspringe Cache/Migrations/Setup (werden durch 'make install' nachgeholt)."
+fi
 
 # Berechtigungen setzen (nach Erzeugung von Cache/Logs durch PHP)
 chown -R www-data:www-data /var/www/html/data /var/www/html/var
