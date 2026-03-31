@@ -38,14 +38,15 @@ fi
 # Bei einem Erstdeploy kann vendor noch leer sein (leeres tls-vendor-Volume),
 # dann übernimmt "make install" diese Schritte nach dem composer install.
 if [ -d /var/www/html/vendor ] && [ -n "$(ls -A /var/www/html/vendor)" ]; then
-    # Symfony Cache warmup
-    php /var/www/html/bin/console cache:warmup --env="$APP_ENV" $DEBUG_FLAG
+    # Symfony Cache warmup (non-fatal: bei Deploy kann vendor veraltet sein,
+    # make install führt diese Schritte nach composer install erneut aus)
+    php /var/www/html/bin/console cache:warmup --env="$APP_ENV" $DEBUG_FLAG || echo "WARN: cache:warmup fehlgeschlagen – wird durch 'make install' nachgeholt."
 
     # Datenbank-Migrationen ausführen
-    php /var/www/html/bin/console doctrine:migrations:migrate --no-interaction --env="$APP_ENV"
+    php /var/www/html/bin/console doctrine:migrations:migrate --no-interaction --env="$APP_ENV" || echo "WARN: Migrationen fehlgeschlagen – wird durch 'make install' nachgeholt."
 
     # Standard-Admin-Benutzer anlegen falls noch keiner existiert
-    php /var/www/html/bin/console app:setup --env="$APP_ENV"
+    php /var/www/html/bin/console app:setup --env="$APP_ENV" || echo "WARN: Setup fehlgeschlagen – wird durch 'make install' nachgeholt."
 else
     echo "vendor/ nicht vorhanden – überspringe Cache/Migrations/Setup (werden durch 'make install' nachgeholt)."
 fi
