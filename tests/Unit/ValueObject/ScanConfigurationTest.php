@@ -19,6 +19,8 @@ class ScanConfigurationTest extends TestCase
         $this->assertFalse($config->notifyOnUnreachable);
         $this->assertSame(2048, $config->minRsaKeyBits);
         $this->assertSame(5, $config->scanConcurrency);
+        $this->assertSame(30, $config->connectionRefusedRetryDelay1);
+        $this->assertSame(60, $config->connectionRefusedRetryDelay2);
     }
 
     public function testCustomValues(): void
@@ -30,6 +32,8 @@ class ScanConfigurationTest extends TestCase
             notifyOnUnreachable: true,
             minRsaKeyBits: 4096,
             scanConcurrency: 10,
+            connectionRefusedRetryDelay1: 15,
+            connectionRefusedRetryDelay2: 45,
         );
 
         $this->assertSame(30, $config->scanTimeout);
@@ -38,6 +42,8 @@ class ScanConfigurationTest extends TestCase
         $this->assertTrue($config->notifyOnUnreachable);
         $this->assertSame(4096, $config->minRsaKeyBits);
         $this->assertSame(10, $config->scanConcurrency);
+        $this->assertSame(15, $config->connectionRefusedRetryDelay1);
+        $this->assertSame(45, $config->connectionRefusedRetryDelay2);
     }
 
     public function testIsReadonly(): void

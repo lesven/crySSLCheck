@@ -55,6 +55,11 @@ class TlsConnector implements TlsConnectorInterface
                     return null;
                 }
 
+                if (stripos($errstr, 'connection refused') !== false) {
+                    $this->logger->info("CONNECTION_REFUSED: {$fqdn}:{$port} - {$errstr}");
+                    return ['connection_refused' => true, 'error' => $errstr];
+                }
+
                 $sslError = openssl_error_string();
                 $combinedErrorMsg = $errstr . ($sslError ? ' ' . $sslError : '');
                 $isCertError = stripos($combinedErrorMsg, 'certificate') !== false

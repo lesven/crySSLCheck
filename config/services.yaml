@@ -8,6 +8,8 @@ parameters:
     app.notify_on_unreachable: '%env(bool:NOTIFY_ON_UNREACHABLE)%'
     app.min_rsa_key_bits: '%env(int:MIN_RSA_KEY_BITS)%'
     app.scan_concurrency: '%env(int:SCAN_CONCURRENCY)%'
+    app.connection_refused_retry_delay_1: '%env(int:CONNECTION_REFUSED_RETRY_DELAY_1)%'
+    app.connection_refused_retry_delay_2: '%env(int:CONNECTION_REFUSED_RETRY_DELAY_2)%'
     app.allow_ip_addresses: '%env(bool:ALLOW_IP_ADDRESSES)%'
     app.domains_per_page: '%env(int:DOMAINS_PER_PAGE)%'
     app.mailer_from_email: '%env(MAILER_FROM_EMAIL)%'
@@ -34,6 +36,8 @@ services:
             $notifyOnUnreachable: '%app.notify_on_unreachable%'
             $minRsaKeyBits: '%app.min_rsa_key_bits%'
             $scanConcurrency: '%app.scan_concurrency%'
+            $connectionRefusedRetryDelay1: '%app.connection_refused_retry_delay_1%'
+            $connectionRefusedRetryDelay2: '%app.connection_refused_retry_delay_2%'
 
     App\Service\ScanService:
         arguments:
