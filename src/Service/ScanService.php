@@ -189,6 +189,18 @@ class ScanService
             }
         }
 
+        if (is_array($result) && isset($result['connection_refused'])) {
+            $this->logger->info("Connection refused für {$fqdn}:{$port} – warte {$this->config->connectionRefusedRetryDelay1}s (Versuch 2/3)");
+            sleep($this->config->connectionRefusedRetryDelay1);
+            $result = $this->tlsConnector->connect($fqdn, $port, $this->config->scanTimeout);
+
+            if (is_array($result) && isset($result['connection_refused'])) {
+                $this->logger->info("Connection refused für {$fqdn}:{$port} – warte {$this->config->connectionRefusedRetryDelay2}s (Versuch 3/3)");
+                sleep($this->config->connectionRefusedRetryDelay2);
+                $result = $this->tlsConnector->connect($fqdn, $port, $this->config->scanTimeout);
+            }
+        }
+
         if ($result === null) {
             return [[
                 'finding_type' => FindingType::Unreachable->value,
